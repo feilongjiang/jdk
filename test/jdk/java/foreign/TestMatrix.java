@@ -33,7 +33,7 @@
 
 /* @test id=UpcallHighArity-FF
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallHighArity
  *
  * @run testng/othervm/native/manual
@@ -45,7 +45,7 @@
 
 /* @test id=UpcallHighArity-TF
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallHighArity
  *
  * @run testng/othervm/native/manual
@@ -57,7 +57,7 @@
 
 /* @test id=UpcallHighArity-FT
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallHighArity
  *
  * @run testng/othervm/native/manual
@@ -69,7 +69,7 @@
 
 /* @test id=UpcallHighArity-TT
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallHighArity
  *
  * @run testng/othervm/native/manual
@@ -79,31 +79,53 @@
  *   TestUpcallHighArity
  */
 
-/* @test id=Downcall-F
+/* @test id=DowncallStack-T
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
- * @build NativeTestHelper CallGeneratorHelper TestDowncall
- *
- * @run testng/othervm/native/manual
- *   --enable-native-access=ALL-UNNAMED
- *   -Djdk.internal.foreign.ProgrammableInvoker.USE_SPEC=false
- *   TestDowncall
- */
-
-/* @test id=Downcall-T
- * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
- * @build NativeTestHelper CallGeneratorHelper TestDowncall
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
+ * @build NativeTestHelper CallGeneratorHelper TestDowncallStack
  *
  * @run testng/othervm/native/manual
  *   --enable-native-access=ALL-UNNAMED
  *   -Djdk.internal.foreign.ProgrammableInvoker.USE_SPEC=true
- *   TestDowncall
+ *   TestDowncallStack
+ */
+
+/* @test id=DowncallStack-F
+ * @enablePreview
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
+ * @build NativeTestHelper CallGeneratorHelper TestDowncallStack
+ *
+ * @run testng/othervm/native/manual
+ *   --enable-native-access=ALL-UNNAMED
+ *   -Djdk.internal.foreign.ProgrammableInvoker.USE_SPEC=false
+ *   TestDowncallStack
+ */
+
+/* @test id=DowncallScope-T
+ * @enablePreview
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
+ * @build NativeTestHelper CallGeneratorHelper TestDowncallScope
+ *
+ * @run testng/othervm/native/manual
+ *   --enable-native-access=ALL-UNNAMED
+ *   -Djdk.internal.foreign.ProgrammableInvoker.USE_SPEC=true
+ *   TestDowncallScope
+ */
+
+/* @test id=DowncallScope-F
+ * @enablePreview
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
+ * @build NativeTestHelper CallGeneratorHelper TestDowncallScope
+ *
+ * @run testng/othervm/native/manual
+ *   --enable-native-access=ALL-UNNAMED
+ *   -Djdk.internal.foreign.ProgrammableInvoker.USE_SPEC=false
+ *   TestDowncallScope
  */
 
 /* @test id=UpcallScope-FF
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
@@ -115,7 +137,7 @@
 
 /* @test id=UpcallScope-TF
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
@@ -127,7 +149,7 @@
 
 /* @test id=UpcallScope-FT
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
@@ -139,7 +161,7 @@
 
 /* @test id=UpcallScope-TT
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
@@ -151,7 +173,7 @@
 
 /* @test id=UpcallAsync-FF
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
@@ -163,7 +185,7 @@
 
 /* @test id=UpcallAsync-TF
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
@@ -175,7 +197,7 @@
 
 /* @test id=UpcallAsync-FT
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
@@ -187,7 +209,7 @@
 
 /* @test id=UpcallAsync-TT
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
@@ -199,7 +221,7 @@
 
 /* @test id=UpcallStack-FF
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
@@ -211,7 +233,7 @@
 
 /* @test id=UpcallStack-TF
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
@@ -223,7 +245,7 @@
 
 /* @test id=UpcallStack-FT
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
@@ -235,7 +257,7 @@
 
 /* @test id=UpcallStack-TT
  * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64"
+ * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
  * @build NativeTestHelper CallGeneratorHelper TestUpcallBase
  *
  * @run testng/othervm/native/manual
