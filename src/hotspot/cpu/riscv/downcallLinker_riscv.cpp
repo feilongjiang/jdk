@@ -86,14 +86,6 @@ public:
     }
 };
 
-static void print_VMRegs(const GrowableArray<VMReg>& input_registers){
-  for (const auto &item: input_registers) {
-    item->print();
-    tty->print(", ");
-  }
-  tty->print_cr("");
-}
-
 static const int native_invoker_code_size = 1024;
 
 RuntimeStub *DowncallLinker::make_downcall_stub(BasicType *signature,

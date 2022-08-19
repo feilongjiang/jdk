@@ -37,6 +37,7 @@ public class TestDowncallBase extends CallGeneratorHelper {
     static Linker LINKER = Linker.nativeLinker();
 
     Object doCall(Addressable symbol, SegmentAllocator allocator, FunctionDescriptor descriptor, Object[] args) throws Throwable {
+        System.out.println(descriptor);
         MethodHandle mh = downcallHandle(LINKER, symbol, allocator, descriptor);
         Object res = mh.invokeWithArguments(args);
         return res;
