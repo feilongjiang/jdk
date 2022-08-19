@@ -32,43 +32,45 @@ public enum CABI {
     SysV,
     Win64,
     LinuxAArch64,
-    MacOsAArch64;
+    MacOsAArch64,
+    LinuxRV64;
 
-    private static final CABI ABI;
-    private static final String ARCH;
-    private static final String OS;
-    private static final long ADDRESS_SIZE;
+    private static final CABI current;
 
     static {
-        ARCH = privilegedGetProperty("os.arch");
-        OS = privilegedGetProperty("os.name");
-        ADDRESS_SIZE = ADDRESS.bitSize();
+        String arch = privilegedGetProperty("os.arch");
+        String os = privilegedGetProperty("os.name");
+        long addressSize = ADDRESS.bitSize();
         // might be running in a 32-bit VM on a 64-bit platform.
         // addressSize will be correctly 32
-        if ((ARCH.equals("amd64") || ARCH.equals("x86_64")) && ADDRESS_SIZE == 64) {
-            if (OS.startsWith("Windows")) {
-                ABI = Win64;
+        if ((arch.equals("amd64") || arch.equals("x86_64")) && addressSize == 64) {
+            if (os.startsWith("Windows")) {
+                current = Win64;
             } else {
-                ABI = SysV;
+                // ?????
+                current = LinuxRV64;
             }
-        } else if (ARCH.equals("aarch64")) {
-            if (OS.startsWith("Mac")) {
-                ABI = MacOsAArch64;
+        } else if (arch.equals("aarch64")) {
+            if (os.startsWith("Mac")) {
+                current = MacOsAArch64;
             } else {
                 // The Linux ABI follows the standard AAPCS ABI
-                ABI = LinuxAArch64;
+                current = LinuxAArch64;
+            }
+        } else if (arch.equals("riscv64")) {
+            if (os.startsWith("Linux")) {
+                current = LinuxRV64;
+            } else {
+                throw new UnsupportedOperationException(
+                        "Unsupported os, arch, or address size: " + os + ", " + arch + ", " + addressSize);
             }
         } else {
-            // unsupported
-            ABI = null;
+            throw new UnsupportedOperationException(
+                    "Unsupported os, arch, or address size: " + os + ", " + arch + ", " + addressSize);
         }
     }
 
     public static CABI current() {
-        if (ABI == null) {
-            throw new UnsupportedOperationException(
-                    "Unsupported os, arch, or address size: " + OS + ", " + ARCH + ", " + ADDRESS_SIZE);
-        }
-        return ABI;
+        return current;
     }
 }

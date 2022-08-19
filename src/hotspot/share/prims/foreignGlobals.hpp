@@ -40,9 +40,12 @@ public:
 struct CallRegs {
   GrowableArray<VMReg> _arg_regs;
   GrowableArray<VMReg> _ret_regs;
-
+  bool _useReturnBuffer; // FIXME -- rename to _lengthSensitive.
+  GrowableArray<long> _offset;
+  GrowableArray<long> _length;
   CallRegs(int num_args, int num_rets)
-    : _arg_regs(num_args), _ret_regs(num_rets) {}
+    : _arg_regs(num_args), _ret_regs(num_rets),
+    _offset(num_rets), _length(num_rets) {}
 };
 
 class ForeignGlobals {

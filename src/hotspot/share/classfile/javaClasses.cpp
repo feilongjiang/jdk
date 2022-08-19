@@ -4326,10 +4326,17 @@ oop jdk_internal_foreign_abi_VMStorage::debugName(oop entry) {
 
 int jdk_internal_foreign_abi_CallConv::_argRegs_offset;
 int jdk_internal_foreign_abi_CallConv::_retRegs_offset;
+int jdk_internal_foreign_abi_CallConv::_useReturnBuffer_offset;
+int jdk_internal_foreign_abi_CallConv::_offset_offset;
+int jdk_internal_foreign_abi_CallConv::_length_offset;
+
 
 #define CallConv_FIELDS_DO(macro) \
   macro(_argRegs_offset, k, "argRegs", jdk_internal_foreign_abi_VMStorage_array_signature, false); \
   macro(_retRegs_offset, k, "retRegs", jdk_internal_foreign_abi_VMStorage_array_signature, false); \
+  macro(_useReturnBuffer_offset, k, "useReturnBuffer", bool_signature, false); \
+  macro(_offset_offset, k, "offset", long_array_signature, false); \
+  macro(_length_offset, k, "length", long_array_signature, false);
 
 bool jdk_internal_foreign_abi_CallConv::is_instance(oop obj) {
   return obj != NULL && is_subclass(obj->klass());
@@ -4353,6 +4360,19 @@ objArrayOop jdk_internal_foreign_abi_CallConv::argRegs(oop entry) {
 objArrayOop jdk_internal_foreign_abi_CallConv::retRegs(oop entry) {
   return oop_cast<objArrayOop>(entry->obj_field(_retRegs_offset));
 }
+
+jboolean jdk_internal_foreign_abi_CallConv::useReturnBuffer(oop entry) {
+  return entry->bool_field(_useReturnBuffer_offset);
+}
+
+typeArrayOop jdk_internal_foreign_abi_CallConv::offset(oop entry) {
+  return oop_cast<typeArrayOop>(entry->obj_field(_offset_offset));
+}
+
+typeArrayOop jdk_internal_foreign_abi_CallConv::length(oop entry) {
+  return oop_cast<typeArrayOop>(entry->obj_field(_length_offset));
+}
+
 
 oop java_lang_invoke_MethodHandle::type(oop mh) {
   return mh->obj_field(_type_offset);
