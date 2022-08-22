@@ -47,8 +47,7 @@ public enum CABI {
             if (os.startsWith("Windows")) {
                 current = Win64;
             } else {
-                // ?????
-                current = LinuxRV64;
+                current = SysV;
             }
         } else if (arch.equals("aarch64")) {
             if (os.startsWith("Mac")) {
