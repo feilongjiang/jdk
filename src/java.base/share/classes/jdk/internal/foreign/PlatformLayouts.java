@@ -34,12 +34,12 @@ public class PlatformLayouts {
             case SysV -> sysv;
             case Win64 -> win64;
             case LinuxAArch64, MacOsAArch64 -> aarch64;
-            case LinuxRV64 -> rv64;
+            case LinuxRISCV64 -> rv64;
         };
     }
 
-    public static final class LinuxRV64{
-        private LinuxRV64() {
+    public static final class LinuxRISCV64 {
+        private LinuxRISCV64() {
             //just the one
         }
 
@@ -91,7 +91,7 @@ public class PlatformLayouts {
         /**
          * The {@code va_list} native type, as it is passed to a function.
          */
-        public static final ValueLayout.OfAddress C_VA_LIST = LinuxRV64.C_POINTER;
+        public static final ValueLayout.OfAddress C_VA_LIST = LinuxRISCV64.C_POINTER;
     }
 
 

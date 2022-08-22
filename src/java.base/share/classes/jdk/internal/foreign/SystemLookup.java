@@ -59,7 +59,7 @@ public class SystemLookup implements SymbolLookup {
     private static final SymbolLookup makeSystemLookup() {
         try {
             return switch (CABI.current()) {
-                case SysV, LinuxAArch64, MacOsAArch64, LinuxRV64 ->
+                case SysV, LinuxAArch64, MacOsAArch64, LinuxRISCV64 ->
                         libLookup(libs -> libs.load(jdkLibraryPath("syslookup")));
                 case Win64 -> makeWindowsLookup(); // out of line to workaround javac crash
             };
@@ -121,7 +121,7 @@ public class SystemLookup implements SymbolLookup {
     private static Path jdkLibraryPath(String name) {
         Path javahome = Path.of(GetPropertyAction.privilegedGetProperty("java.home"));
         String lib = switch (CABI.current()) {
-            case SysV, LinuxAArch64, MacOsAArch64, LinuxRV64 -> "lib";
+            case SysV, LinuxAArch64, MacOsAArch64, LinuxRISCV64 -> "lib";
             case Win64 -> "bin";
         };
         String libname = System.mapLibraryName(name);

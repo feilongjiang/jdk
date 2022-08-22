@@ -33,7 +33,7 @@ public enum CABI {
     Win64,
     LinuxAArch64,
     MacOsAArch64,
-    LinuxRV64;
+    LinuxRISCV64;
 
     private static final CABI current;
 
@@ -59,7 +59,7 @@ public enum CABI {
             }
         } else if (arch.equals("riscv64")) {
             if (os.startsWith("Linux")) {
-                current = LinuxRV64;
+                current = LinuxRISCV64;
             } else {
                 throw new UnsupportedOperationException(
                         "Unsupported os, arch, or address size: " + os + ", " + arch + ", " + addressSize);

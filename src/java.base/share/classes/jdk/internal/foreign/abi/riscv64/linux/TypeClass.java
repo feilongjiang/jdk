@@ -1,4 +1,4 @@
-package jdk.internal.foreign.abi.rv64.linux;
+package jdk.internal.foreign.abi.riscv64.linux;
 
 
 import java.lang.foreign.*;

@@ -96,7 +96,7 @@ public class UpcallLinker {
         VMStorage[] rets = Arrays.stream(retMoves).map(Binding.Move::storage).toArray(VMStorage[]::new);
 
         CallRegs conv;
-        if (CABI.current() == CABI.LinuxRV64){
+        if (CABI.current() == CABI.LinuxRISCV64){
             conv = new CallRegs(args, rets, lengthSensitive, offset, length);
         } else{
             conv = new CallRegs(args, rets, false, null, null);

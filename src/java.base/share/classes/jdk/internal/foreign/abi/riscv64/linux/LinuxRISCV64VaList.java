@@ -1,4 +1,4 @@
-package jdk.internal.foreign.abi.rv64.linux;
+package jdk.internal.foreign.abi.riscv64.linux;
 
 import jdk.internal.foreign.MemorySessionImpl;
 import jdk.internal.foreign.Scoped;
@@ -16,7 +16,7 @@ import java.util.Objects;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 import static jdk.internal.foreign.abi.SharedUtils.*;
 
-public non-sealed class LinuxRV64VaList implements VaList, Scoped {
+public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
     private final MemorySegment segment;
     private long offset;
 
@@ -28,7 +28,7 @@ public non-sealed class LinuxRV64VaList implements VaList, Scoped {
         return EMPTY;
     }
 
-    public LinuxRV64VaList(MemorySegment segment, long offset) {
+    public LinuxRISCV64VaList(MemorySegment segment, long offset) {
         this.segment = segment;
         this.offset = offset;
     }
@@ -136,7 +136,7 @@ public non-sealed class LinuxRV64VaList implements VaList, Scoped {
     public VaList copy() {
         MemorySessionImpl sessionImpl = MemorySessionImpl.toSessionImpl(segment.session());
         sessionImpl.checkValidState();
-        return new LinuxRV64VaList(segment, offset);
+        return new LinuxRISCV64VaList(segment, offset);
     }
 
     @Override
@@ -146,7 +146,7 @@ public non-sealed class LinuxRV64VaList implements VaList, Scoped {
 
     @Override
     public String toString() {
-        return "LinuxRV64VaList{" + "seg: " + address() + ", " + "offset: " + offset + '}';
+        return "LinuxRISCV64VaList{" + "seg: " + address() + ", " + "offset: " + offset + '}';
     }
 
     public static non-sealed class Builder implements VaList.Builder {
@@ -227,7 +227,7 @@ public non-sealed class LinuxRV64VaList implements VaList, Scoped {
                 long alignedSize = Utils.alignUp(layout.byteSize(), STACK_SLOT_SIZE);
                 writeCursor = writeCursor.asSlice(alignedSize);
             }
-            return new LinuxRV64VaList(argsSegment, 0L);
+            return new LinuxRISCV64VaList(argsSegment, 0L);
         }
 
     }

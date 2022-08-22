@@ -1,12 +1,12 @@
-package jdk.internal.foreign.abi.rv64;
+package jdk.internal.foreign.abi.riscv64;
 
 import jdk.internal.foreign.abi.ABIDescriptor;
 import jdk.internal.foreign.abi.Architecture;
 import jdk.internal.foreign.abi.VMStorage;
 
 
-public class RV64Architecture implements Architecture {
-    public static final Architecture INSTANCE = new RV64Architecture();
+public class RISCV64Architecture implements Architecture {
+    public static final Architecture INSTANCE = new RISCV64Architecture();
 
     private static final int INTEGER_REG_SIZE = 8; // bytes
     private static final int FLOAT_REG_SIZE = 8;
@@ -87,15 +87,15 @@ public class RV64Architecture implements Architecture {
     public static final VMStorage f31 = floatRegister(31, "ft11");    // ft11
 
     private static VMStorage integerRegister(int index, String debugName) {
-        return new VMStorage(RV64Architecture.StorageClasses.INTEGER, index, debugName);
+        return new VMStorage(RISCV64Architecture.StorageClasses.INTEGER, index, debugName);
     }
 
     private static VMStorage floatRegister(int index, String debugName) {
-        return new VMStorage(RV64Architecture.StorageClasses.FLOAT, index, debugName);
+        return new VMStorage(RISCV64Architecture.StorageClasses.FLOAT, index, debugName);
     }
 
     public static VMStorage stackStorage(int index) {
-        return new VMStorage(RV64Architecture.StorageClasses.STACK, index, "Stack@" + index);
+        return new VMStorage(RISCV64Architecture.StorageClasses.STACK, index, "Stack@" + index);
     }
 
     @Override

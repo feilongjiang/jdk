@@ -34,7 +34,7 @@ import jdk.internal.foreign.abi.aarch64.linux.LinuxAArch64VaList;
 import jdk.internal.foreign.abi.aarch64.macos.MacOsAArch64VaList;
 import jdk.internal.foreign.abi.x64.sysv.SysVVaList;
 import jdk.internal.foreign.abi.x64.windows.WinVaList;
-import jdk.internal.foreign.abi.rv64.linux.LinuxRV64VaList;
+import jdk.internal.foreign.abi.riscv64.linux.LinuxRISCV64VaList;
 import jdk.internal.javac.PreviewFeature;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
@@ -68,7 +68,7 @@ import jdk.internal.reflect.Reflection;
  * @since 19
  */
 @PreviewFeature(feature=PreviewFeature.Feature.FOREIGN)
-sealed public interface VaList extends Addressable permits WinVaList, SysVVaList, LinuxAArch64VaList, MacOsAArch64VaList, LinuxRV64VaList, SharedUtils.EmptyVaList {
+sealed public interface VaList extends Addressable permits WinVaList, SysVVaList, LinuxAArch64VaList, MacOsAArch64VaList, LinuxRISCV64VaList, SharedUtils.EmptyVaList {
 
     /**
      * {@return the memory session associated with this variable argument list}
@@ -267,7 +267,7 @@ sealed public interface VaList extends Addressable permits WinVaList, SysVVaList
      * @since 19
      */
     @PreviewFeature(feature=PreviewFeature.Feature.FOREIGN)
-    sealed interface Builder permits WinVaList.Builder, SysVVaList.Builder, LinuxAArch64VaList.Builder, MacOsAArch64VaList.Builder,LinuxRV64VaList.Builder {
+    sealed interface Builder permits WinVaList.Builder, SysVVaList.Builder, LinuxAArch64VaList.Builder, MacOsAArch64VaList.Builder, LinuxRISCV64VaList.Builder {
 
         /**
          * Writes an {@code int} value to the variable argument list being constructed.

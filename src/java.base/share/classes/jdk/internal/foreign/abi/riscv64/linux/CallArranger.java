@@ -1,4 +1,4 @@
-package jdk.internal.foreign.abi.rv64.linux;
+package jdk.internal.foreign.abi.riscv64.linux;
 
 import jdk.internal.foreign.PlatformLayouts;
 import jdk.internal.foreign.Utils;
@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Optional;
 
 
-import static jdk.internal.foreign.abi.rv64.RV64Architecture.*;
-import static jdk.internal.foreign.abi.rv64.linux.TypeClass.*;
+import static jdk.internal.foreign.abi.riscv64.RISCV64Architecture.*;
+import static jdk.internal.foreign.abi.riscv64.linux.TypeClass.*;
 
 
 /**
@@ -98,7 +98,7 @@ public class CallArranger {
         boolean returnInMemory = isInMemoryReturn(cDesc.returnLayout());
         if (returnInMemory) {
             Class<?> carrier = MemoryAddress.class;
-            MemoryLayout layout = PlatformLayouts.LinuxRV64.C_POINTER;
+            MemoryLayout layout = PlatformLayouts.LinuxRISCV64.C_POINTER;
             csb.addArgumentBindings(carrier, layout, argCalc.getBindings(carrier, layout, false));
         } else if (cDesc.returnLayout().isPresent()) {
             Class<?> carrier = mt.returnType();
@@ -426,7 +426,7 @@ public class CallArranger {
                     bindings.copy(layout)
                             .unboxAddress(MemorySegment.class);
                     VMStorage storage = storageCalculator.nextStorage(
-                            StorageClasses.INTEGER, PlatformLayouts.LinuxRV64.C_POINTER);
+                            StorageClasses.INTEGER, PlatformLayouts.LinuxRISCV64.C_POINTER);
                     bindings.vmStore(storage, long.class);
                 }
                 default -> throw new UnsupportedOperationException("Unhandled class " + argumentClass);
@@ -475,7 +475,7 @@ public class CallArranger {
                 case STRUCT_REFERENCE -> {
                     assert carrier == MemorySegment.class;
                     VMStorage storage = storageCalculator.nextStorage(
-                            StorageClasses.INTEGER, PlatformLayouts.LinuxRV64.C_POINTER);
+                            StorageClasses.INTEGER, PlatformLayouts.LinuxRISCV64.C_POINTER);
                     bindings.vmLoad(storage, long.class)
                             .boxAddress()
                             .toSegment(layout);
