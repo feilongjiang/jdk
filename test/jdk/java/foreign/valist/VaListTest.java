@@ -36,8 +36,8 @@
  *          java.base/jdk.internal.foreign.abi.aarch64.linux
  *          java.base/jdk.internal.foreign.abi.aarch64.macos
  *          java.base/jdk.internal.foreign.abi.aarch64.windows
- *          java.base/jdk.internal.foreign.abi.rv64
- *          java.base/jdk.internal.foreign.abi.rv64.linux
+ *          java.base/jdk.internal.foreign.abi.riscv64
+ *          java.base/jdk.internal.foreign.abi.riscv64.linux
  * @run testng/othervm --enable-native-access=ALL-UNNAMED VaListTest
  */
 
