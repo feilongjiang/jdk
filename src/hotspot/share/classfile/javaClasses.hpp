@@ -1200,7 +1200,7 @@ class jdk_internal_foreign_abi_CallConv: AllStatic {
  private:
   static int _argRegs_offset;
   static int _retRegs_offset;
-  static int _useReturnBuffer_offset;
+  static int _lengthSensitive_offset;
   static int _offset_offset;
   static int _length_offset;
 
@@ -1213,7 +1213,7 @@ class jdk_internal_foreign_abi_CallConv: AllStatic {
   // Accessors
   static objArrayOop argRegs(oop entry);
   static objArrayOop retRegs(oop entry);
-  static jboolean useReturnBuffer(oop entry);
+  static jboolean lengthSensitive(oop entry);
   static typeArrayOop offset(oop entry);
   static typeArrayOop length(oop entry);
 

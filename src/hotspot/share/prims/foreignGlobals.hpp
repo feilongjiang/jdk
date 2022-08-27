@@ -40,7 +40,7 @@ public:
 struct CallRegs {
   GrowableArray<VMReg> _arg_regs;
   GrowableArray<VMReg> _ret_regs;
-  bool _useReturnBuffer; // FIXME -- rename to _lengthSensitive.
+  bool _length_sensitive;
   GrowableArray<long> _offset;
   GrowableArray<long> _length;
   CallRegs(int num_args, int num_rets)

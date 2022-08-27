@@ -28,8 +28,6 @@ package jdk.internal.foreign.abi;
 import jdk.internal.foreign.CABI;
 import sun.security.action.GetPropertyAction;
 
-import java.lang.foreign.FunctionDescriptor;
-import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.MemorySession;
 import java.lang.invoke.MethodHandle;
@@ -206,7 +204,7 @@ public class UpcallLinker {
     }
 
     // used for transporting data into native code
-    private static record CallRegs(VMStorage[] argRegs, VMStorage[] retRegs, boolean useReturnBuffer,
+    private static record CallRegs(VMStorage[] argRegs, VMStorage[] retRegs, boolean lengthSensitive,
                                    long[] offset, long[] length) {}
 
     static native long makeUpcallStub(MethodHandle mh, ABIDescriptor abi, CallRegs conv,

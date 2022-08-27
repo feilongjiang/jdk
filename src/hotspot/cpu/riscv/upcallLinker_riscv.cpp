@@ -279,7 +279,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
     assert(ret_buf_offset != -1, "no return buffer allocated");
     __ la(tmp1, Address(sp, ret_buf_offset));
     // lengthSensitive.
-    if (call_regs._useReturnBuffer) {
+    if (call_regs._length_sensitive) {
       for (int i = 0; i < call_regs._ret_regs.length(); i++) {
         long length = call_regs._length.at(i);
         long offset = call_regs._offset.at(i);
