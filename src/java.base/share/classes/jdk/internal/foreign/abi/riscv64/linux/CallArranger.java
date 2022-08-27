@@ -66,30 +66,6 @@ public class CallArranger {
 
     }
 
-    private record SFAField(int offset, Class<?> type) {
-    }
-
-    static SFAField[] parseSFA(GroupLayout sfa) {
-        assert classifyLayout(sfa) == TypeClass.STRUCT_SFA : "must accept sfa.";
-        int offset = 0;
-        int cnt = 0;
-        SFAField[] offsetArr = new SFAField[2];
-        for (MemoryLayout member : sfa.memberLayouts()) {
-
-            if (!member.isPadding() && TypeClass.classifyElementLayout(member) == TypeClass.FLOAT) {
-                offsetArr[cnt++] = new SFAField(offset,
-                        SharedUtils.primitiveCarrierForSize(member.byteSize(), true));
-            }
-            offset += (int) member.byteSize();
-        }
-        if (cnt == 1)
-            return new SFAField[]{offsetArr[0]};
-        if (cnt == 2)
-            return new SFAField[]{offsetArr[0], offsetArr[1]};
-        throw new IllegalArgumentException("bad SFA.");
-    }
-
-
     public static CallArranger.Bindings getBindings(MethodType mt, FunctionDescriptor cDesc, boolean forUpcall) {
         CallingSequenceBuilder csb = new CallingSequenceBuilder(CLinux, forUpcall);
         BindingCalculator argCalc = forUpcall ? new BoxBindingCalculator(true) : new UnboxBindingCalculator(true);
@@ -232,7 +208,7 @@ public class CallArranger {
         VMStorage[] allocStorage(int type, MemoryLayout layout, boolean isSFA) {
             int regCnt;
             if (isSFA) {
-                regCnt = parseSFA((GroupLayout) layout).length;
+                regCnt = getFlattenedFields((GroupLayout) layout).size();
             } else {
                 regCnt = ((int) Utils.alignUp(layout.byteSize(), 8)) / 8;
             }
@@ -323,8 +299,8 @@ public class CallArranger {
 
                 case STRUCT_SFA -> {
                     assert carrier == MemorySegment.class;
-                    SFAField[] offsetArr = parseSFA((GroupLayout) layout);
-                    int fieldCnt = offsetArr.length;
+                    List<FlattenedField> offsetArr = getFlattenedFields((GroupLayout) layout);
+                    int fieldCnt = offsetArr.size();
                     VMStorage[] locations = storageCalculator.allocStorage(
                             StorageClasses.FLOAT, layout, true);
                     if (fieldCnt == locations.length) {
@@ -334,8 +310,9 @@ public class CallArranger {
                             this.offset = new long[fieldCnt];
                         }
                         for (int i = 0; i < locations.length; ++i) {
-                            int offset = offsetArr[i].offset();
-                            Class<?> type = offsetArr[i].type();
+                            int offset = offsetArr.get(i).offset();
+                            Class<?> type = SharedUtils.primitiveCarrierForSize(offsetArr.get(i).byteSize(),
+                                                                                true);
                             VMStorage storage = locations[i];
                             if (i == 0 && locations.length > 1) bindings.dup();
                             bindings.bufferLoad(offset, type)
@@ -368,35 +345,31 @@ public class CallArranger {
                         VMStorage[] locations = new VMStorage[2];
                         locations[0] = storageCalculator.regAlloc(StorageClasses.INTEGER, 1, false, false)[0];
                         locations[1] = storageCalculator.regAlloc(StorageClasses.FLOAT, 1, false, false)[0];
-                        int offset = 0;
                         int reminder = 2;
                         int i = 0;
-                        for (MemoryLayout memberLayout : ((GroupLayout) layout).memberLayouts()) {
-                            if (memberLayout.isPadding()) {
-                                offset += memberLayout.byteSize();
-                                continue;
-                            }
-                            if (classifyElementLayout(memberLayout) == INTEGER) {
-                                Class<?> type = SharedUtils.primitiveCarrierForSize(memberLayout.byteSize(),
-                                        false);
+                        List<FlattenedField> flattenedFields = getFlattenedFields((GroupLayout) layout);
+                        for (FlattenedField field : flattenedFields) {
+                            if (field.typeClass() == INTEGER){
+                                Class<?> type = SharedUtils.primitiveCarrierForSize(field.byteSize(),
+                                                                                    false);
                                 if (--reminder > 0) bindings.dup();
-                                bindings.bufferLoad(offset, type)
+                                bindings.bufferLoad(field.offset(), type)
                                         .vmStore(locations[0], type);
-                            } else if (classifyElementLayout(memberLayout) == FLOAT) {
-                                Class<?> type = SharedUtils.primitiveCarrierForSize(memberLayout.byteSize(),
-                                        true);
+                            } else if (field.typeClass() == FLOAT) {
+                                Class<?> type = SharedUtils.primitiveCarrierForSize(field.byteSize(),
+                                                                                    true);
                                 if (--reminder > 0) bindings.dup();
-                                bindings.bufferLoad(offset, type)
+                                bindings.bufferLoad(field.offset(), type)
                                         .vmStore(locations[1], type);
                             } else {
-                                throw new UnsupportedOperationException("Unhandled field " + memberLayout);
+                                throw new UnsupportedOperationException("Unhandled field " + field.typeClass());
                             }
+
                             assert reminder >= 0;
                             if (!forArguments) {
                                 this.offset[i] = i * 8L;
-                                this.length[i] = memberLayout.byteSize();
+                                this.length[i] = field.byteSize();
                             }
-                            offset += memberLayout.byteSize();
                             i += 1;
                         }
                     } else
@@ -485,31 +458,24 @@ public class CallArranger {
                     bindings.allocate(layout);
                     if (storageCalculator.nRegs[0] < StorageCalculator.MAX_REGISTER_ARGUMENTS &&
                             storageCalculator.nRegs[1] < StorageCalculator.MAX_REGISTER_ARGUMENTS) {
+                        List<FlattenedField> flattenedFields = getFlattenedFields((GroupLayout) layout);
                         VMStorage[] locations = new VMStorage[2];
                         locations[0] = storageCalculator.regAlloc(StorageClasses.INTEGER, 1, false, false)[0];
                         locations[1] = storageCalculator.regAlloc(StorageClasses.FLOAT, 1, false, false)[0];
-                        int offset = 0;
-                        for (MemoryLayout memberLayout : ((GroupLayout) layout).memberLayouts()) {
-                            if (memberLayout.isPadding()) {
-                                offset += memberLayout.byteSize();
-                                continue;
-                            }
-                            if (classifyElementLayout(memberLayout) == INTEGER) {
-                                Class<?> type = SharedUtils.primitiveCarrierForSize(memberLayout.byteSize(),
-                                                                                    false);
+                        for (FlattenedField field : flattenedFields) {
+                            if (field.typeClass() == INTEGER) {
+                                Class<?> type = SharedUtils.primitiveCarrierForSize(field.byteSize(), false);
                                 bindings.dup()
                                         .vmLoad(locations[0], type)
-                                        .bufferStore(offset, type);
-                            } else if (classifyElementLayout(memberLayout) == FLOAT) {
-                                Class<?> type = SharedUtils.primitiveCarrierForSize(memberLayout.byteSize(),
-                                                                                    true);
+                                        .bufferStore(field.offset(), type);
+                            } else if (field.typeClass() == FLOAT) {
+                                Class<?> type = SharedUtils.primitiveCarrierForSize(field.byteSize(), true);
                                 bindings.dup()
                                         .vmLoad(locations[1], type)
-                                        .bufferStore(offset, type);
+                                        .bufferStore(field.offset(), type);
                             } else {
-                                throw new UnsupportedOperationException("Unhandled field " + memberLayout);
+                                throw new UnsupportedOperationException("Unhandled field " + field.typeClass());
                             }
-                            offset += memberLayout.byteSize();
                         }
                     } else
                         return getBindings(carrier, layout, STRUCT_REGISTER);
@@ -517,14 +483,15 @@ public class CallArranger {
                 case STRUCT_SFA -> {
                     assert carrier == MemorySegment.class;
                     bindings.allocate(layout);
-                    SFAField[] offsetArr = parseSFA((GroupLayout) layout);
-                    int fieldCnt = offsetArr.length;
+                    List<FlattenedField> offsetArr = getFlattenedFields((GroupLayout) layout);
+                    int fieldCnt = offsetArr.size();
                     VMStorage[] locations = storageCalculator.allocStorage(
                             StorageClasses.FLOAT, layout, true);
                     if (fieldCnt == locations.length) {
                         for (int i = 0; i < locations.length; ++i) {
-                            int offset = offsetArr[i].offset();
-                            Class<?> type = offsetArr[i].type();
+                            int offset = offsetArr.get(i).offset();
+                            Class<?> type = SharedUtils.primitiveCarrierForSize(offsetArr.get(i).byteSize(),
+                                                                                true);
                             VMStorage storage = locations[i];
                             bindings.dup()
                                     .vmLoad(storage, type)
