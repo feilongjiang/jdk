@@ -16,12 +16,7 @@ import static jdk.internal.foreign.abi.riscv64.RISCV64Architecture.*;
 import static jdk.internal.foreign.abi.riscv64.linux.TypeClass.*;
 
 
-/**
- * For the SysV x64 C ABI specifically, this class uses namely CallingSequenceBuilder
- * to translate a C FunctionDescriptor into a CallingSequence, which can then be turned into a MethodHandle.
- * <p>
- * This includes taking care of synthetic arguments like pointers to return buffers for 'in-memory' returns.
- */
+
 public class CallArranger {
     private static final int STACK_SLOT_SIZE = 8;
     // https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-cc.adoc

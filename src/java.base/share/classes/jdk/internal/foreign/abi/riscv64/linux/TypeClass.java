@@ -35,13 +35,13 @@ public enum TypeClass {
                                       pointerCnt + other.pointerCnt);
         }
 
-        boolean isSFA(boolean hasZeroLengthArray) {
+        boolean isSFA() {
             return integerCnt == 0 && pointerCnt == 0 &&
-                    (floatCnt == 1 || (floatCnt == 2 && !hasZeroLengthArray));
+                    (floatCnt == 1 || floatCnt == 2);
         }
 
-        boolean isIAF(boolean hasZeroLengthArray) {
-            return integerCnt == 1 && floatCnt == 1 && pointerCnt == 0 && !hasZeroLengthArray;
+        boolean isIAF() {
+            return integerCnt == 1 && floatCnt == 1 && pointerCnt == 0;
         }
     }
 
@@ -91,8 +91,6 @@ public enum TypeClass {
     }
 
     private static class AggregateClassifier {
-        boolean hasZeroLengthArray = false;
-
         private FlattenCounter countFlattenedLayout(MemoryLayout layout) {
             if (layout instanceof ValueLayout valueLayout) {
                 return switch (classifyValueType(valueLayout)) {
@@ -113,7 +111,6 @@ public enum TypeClass {
                 return currCounter;
             } else if (layout instanceof SequenceLayout sequenceLayout) {
                 long elementCount = sequenceLayout.elementCount();
-                if (elementCount == 0) hasZeroLengthArray = true;
                 return countFlattenedLayout(sequenceLayout.elementLayout()).mul(elementCount);
             } else {
                 throw new IllegalStateException("Cannot get here: " + layout);
@@ -129,13 +126,13 @@ public enum TypeClass {
          * */
         private boolean isSimpleFloatAggregate(GroupLayout groupLayout) {
             if (groupLayout.byteSize() > 8 * MAX_AGGREGATE_REGS_SIZE) return false;
-            return countFlattenedLayout(groupLayout).isSFA(hasZeroLengthArray);
+            return countFlattenedLayout(groupLayout).isSFA();
         }
 
         // pointer is not a integer.
         private boolean isIAFAggregate(GroupLayout groupLayout) {
             if (groupLayout.byteSize() > 8 * MAX_AGGREGATE_REGS_SIZE) return false;
-            return countFlattenedLayout(groupLayout).isIAF(hasZeroLengthArray);
+            return countFlattenedLayout(groupLayout).isIAF();
         }
 
         private boolean isRegisterAggregate(MemoryLayout type) {
