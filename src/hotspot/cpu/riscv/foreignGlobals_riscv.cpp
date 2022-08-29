@@ -23,21 +23,15 @@
  *
  */
 
-#include "precompiled.hpp"
-#include "code/vmreg.hpp"
-#include "prims/foreignGlobals.hpp"
-#include "utilities/debug.hpp"
 #include "classfile/javaClasses.hpp"
-#include "runtime/jniHandles.inline.hpp"
+#include "code/vmreg.hpp"
+#include "precompiled.hpp"
+#include "prims/foreignGlobals.hpp"
 #include "prims/foreignGlobals.inline.hpp"
+#include "runtime/jniHandles.inline.hpp"
+#include "utilities/debug.hpp"
 
 class MacroAssembler;
-
-enum class RegType {
-    INTEGER = 0,
-    FLOAT = 1,
-    STACK = 3
-};
 
 static constexpr int INTEGER_TYPE = 0;
 static constexpr int FLOAT_TYPE = 1;
@@ -72,8 +66,14 @@ const ABIDescriptor ForeignGlobals::parse_abi_descriptor(jobject jabi) {
 VMReg ForeignGlobals::vmstorage_to_vmreg(int type, int index) {
   switch (static_cast<RegType>(type)) {
     case RegType::INTEGER:
+    case RegType::INTEGER_8:
+    case RegType::INTEGER_16:
+    case RegType::INTEGER_32:
+    case RegType::INTEGER_64:
       return ::as_Register(index)->as_VMReg();
     case RegType::FLOAT:
+    case RegType::FLOAT_32:
+    case RegType::FLOAT_64:
       return ::as_FloatRegister(index)->as_VMReg();
     case RegType::STACK:
       return VMRegImpl::stack2reg(index LP64_ONLY(*2)); // numbering on x64 goes per 64-bits

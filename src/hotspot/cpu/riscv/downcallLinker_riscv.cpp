@@ -23,13 +23,13 @@
  *
  */
 
-#include "precompiled.hpp"
 #include "asm/macroAssembler.hpp"
 #include "code/codeBlob.hpp"
 #include "logging/logStream.hpp"
 #include "memory/resourceArea.hpp"
-#include "prims/foreignGlobals.inline.hpp"
+#include "precompiled.hpp"
 #include "prims/downcallLinker.hpp"
+#include "prims/foreignGlobals.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stubCodeGenerator.hpp"
 

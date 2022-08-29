@@ -28,7 +28,7 @@ package jdk.internal.foreign.abi.riscv64;
 import jdk.internal.foreign.abi.ABIDescriptor;
 import jdk.internal.foreign.abi.Architecture;
 import jdk.internal.foreign.abi.VMStorage;
-
+import jdk.internal.foreign.abi.riscv64.linux.TypeClass;
 
 public class RISCV64Architecture implements Architecture {
     public static final Architecture INSTANCE = new RISCV64Architecture();
@@ -36,13 +36,43 @@ public class RISCV64Architecture implements Architecture {
     private static final int INTEGER_REG_SIZE = 8; // bytes
     private static final int FLOAT_REG_SIZE = 8;
     private static final int STACK_SLOT_SIZE = 8;
-    // https://github.com/riscv-non-isa/riscv-elf-psabi-doc/issues/21#issuecomment-292990546
-    // https://riscv.org/wp-content/uploads/2015/01/riscv-calling.pdf
 
-    public interface StorageClasses {
+    // While allocating, should use AllocationClass.
+    public interface AllocationClasses {
         int INTEGER = 0;
         int FLOAT = 1;
-        int STACK = 3;
+        int STACK = 2;
+    }
+
+    // To encode length message into VMStorage objects, define different StorageClass.
+    public interface StorageClasses {
+        int INTEGER_8 = 3;
+        int INTEGER_16 = 4;
+        int INTEGER_32 = 5;
+        int INTEGER_64 = 6;
+        int FLOAT_32 = 7;
+        int FLOAT_64 = 8;
+
+        public static int fromTypeClass(TypeClass typeClass) {
+            return switch (typeClass) {
+                case INTEGER_8 -> INTEGER_8;
+                case INTEGER_16 -> INTEGER_16;
+                case INTEGER_32 -> INTEGER_32;
+                case INTEGER_64, POINTER -> INTEGER_64;
+                case FLOAT_64 -> FLOAT_64;
+                case FLOAT_32 -> FLOAT_32;
+                default -> -1;
+            };
+        }
+
+        public static int toIntegerClass(int floatClass) {
+            assert floatClass == FLOAT_32 || floatClass == FLOAT_64;
+            return switch (floatClass) {
+                case FLOAT_32 -> INTEGER_32;
+                case FLOAT_64 -> INTEGER_64;
+                default -> -1;
+            };
+        }
     }
 
     public static final VMStorage x0 = integerRegister(0, "zero");    // zero
@@ -112,37 +142,39 @@ public class RISCV64Architecture implements Architecture {
     public static final VMStorage f31 = floatRegister(31, "ft11");    // ft11
 
     private static VMStorage integerRegister(int index, String debugName) {
-        return new VMStorage(RISCV64Architecture.StorageClasses.INTEGER, index, debugName);
+        return new VMStorage(AllocationClasses.INTEGER, index, debugName);
     }
 
     private static VMStorage floatRegister(int index, String debugName) {
-        return new VMStorage(RISCV64Architecture.StorageClasses.FLOAT, index, debugName);
+        return new VMStorage(AllocationClasses.FLOAT, index, debugName);
     }
 
     public static VMStorage stackStorage(int index) {
-        return new VMStorage(RISCV64Architecture.StorageClasses.STACK, index, "Stack@" + index);
+        return new VMStorage(AllocationClasses.STACK, index, "Stack@" + index);
     }
 
     @Override
     public boolean isStackType(int cls) {
-        return cls == StorageClasses.STACK;
+        return cls == AllocationClasses.STACK;
     }
 
     @Override
     public int typeSize(int cls) {
         switch (cls) {
-            case StorageClasses.INTEGER: return INTEGER_REG_SIZE;
-            case StorageClasses.FLOAT: return FLOAT_REG_SIZE;
-            case StorageClasses.STACK: return STACK_SLOT_SIZE;
+            case AllocationClasses.INTEGER, StorageClasses.INTEGER_8, StorageClasses.INTEGER_16,
+                    StorageClasses.INTEGER_32, StorageClasses.INTEGER_64:
+                return INTEGER_REG_SIZE;
+            case AllocationClasses.FLOAT, StorageClasses.FLOAT_32, StorageClasses.FLOAT_64:
+                return FLOAT_REG_SIZE;
+            case AllocationClasses.STACK:
+                return STACK_SLOT_SIZE;
         }
-
         throw new IllegalArgumentException("Invalid Storage Class: " + cls);
-
     }
 
     @Override
     public int stackType() {
-        return StorageClasses.STACK;
+        return AllocationClasses.STACK;
     }
 
     public static ABIDescriptor abiFor(VMStorage[] inputIntRegs, VMStorage[] inputFloatRegs, VMStorage[] outputIntRegs,
@@ -167,5 +199,4 @@ public class RISCV64Architecture implements Architecture {
                 shadowSpace,
                 targetAddrStorage, retBufAddrStorage);
     }
-
 }

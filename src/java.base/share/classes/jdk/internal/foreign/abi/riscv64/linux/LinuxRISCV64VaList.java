@@ -29,16 +29,15 @@ import jdk.internal.foreign.Scoped;
 import jdk.internal.foreign.Utils;
 import jdk.internal.foreign.abi.SharedUtils;
 
-
 import java.lang.foreign.*;
-
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 import static java.lang.foreign.ValueLayout.ADDRESS;
-import static jdk.internal.foreign.abi.SharedUtils.*;
+import static jdk.internal.foreign.abi.SharedUtils.SimpleVaArg;
+import static jdk.internal.foreign.abi.SharedUtils.THROWING_ALLOCATOR;
 
 public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
     private final MemorySegment segment;
@@ -98,7 +97,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
         checkStackElement(layout);
         preAlignStack();
         return switch (typeClass) {
-            case STRUCT_REGISTER, STRUCT_SFA, STRUCT_IAF -> {
+            case STRUCT_A, STRUCT_FA, STRUCT_BOTH -> {
                 // Struct is passed indirectly via a pointer in an integer register.
                 MemorySegment slice = segment.asSlice(offset, layout.byteSize());
                 MemorySegment seg = allocator.allocate(layout);
@@ -106,7 +105,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
                 postAlignStack(layout);
                 yield seg;
             }
-            case INTEGER, FLOAT, POINTER -> {
+            case INTEGER_8, INTEGER_16, INTEGER_32, INTEGER_64, FLOAT_32, FLOAT_64, POINTER -> {
                 VarHandle reader = layout.varHandle();
                 MemorySegment slice = segment.asSlice(offset, layout.byteSize());
                 Object res = reader.get(slice);
@@ -148,9 +147,9 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
             Objects.requireNonNull(layout);
             TypeClass typeClass = TypeClass.classifyLayout(layout);
             switch (typeClass) {
-                case INTEGER, FLOAT, POINTER, STRUCT_REFERENCE -> offset += 8;
-                case STRUCT_REGISTER, STRUCT_IAF, STRUCT_SFA ->
-                        offset += Utils.alignUp(layout.byteSize(), STACK_SLOT_SIZE);
+                case INTEGER_8, INTEGER_16, INTEGER_32, INTEGER_64, FLOAT_32, FLOAT_64, POINTER, STRUCT_REFERENCE ->
+                        offset += 8;
+                case STRUCT_A, STRUCT_BOTH, STRUCT_FA -> offset += Utils.alignUp(layout.byteSize(), STACK_SLOT_SIZE);
                 case SEQUENCE -> throw new IllegalArgumentException("Can not handle MemoryLayout: " + layout);
             }
         }
@@ -223,11 +222,11 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
             if (isEmpty()) return EMPTY;
             SegmentAllocator allocator = SegmentAllocator.newNativeArena(session);
             long stackArgsSize = stackSlot.stream()
-                    .reduce(0L, (acc, e) -> {
-                        long elementSize = TypeClass.classifyLayout(e.layout) == TypeClass.STRUCT_REFERENCE ?
-                                ADDRESS.byteSize() : e.layout.byteSize();
-                        return acc + Utils.alignUp(elementSize, STACK_SLOT_SIZE);
-                    }, Long::sum);
+                                          .reduce(0L, (acc, e) -> {
+                                              long elementSize = TypeClass.classifyLayout(e.layout) == TypeClass.STRUCT_REFERENCE ?
+                                                      ADDRESS.byteSize() : e.layout.byteSize();
+                                              return acc + Utils.alignUp(elementSize, STACK_SLOT_SIZE);
+                                          }, Long::sum);
             MemorySegment argsSegment = allocator.allocate(stackArgsSize, 16);
             MemorySegment writeCursor = argsSegment;
             for (SimpleVaArg arg : stackSlot) {
@@ -235,7 +234,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
                 Object value;
                 if (TypeClass.classifyLayout(arg.layout) == TypeClass.STRUCT_REFERENCE) {
                     layout = ADDRESS;
-                    value = ((MemorySegment)arg.value).address();
+                    value = ((MemorySegment) arg.value).address();
                 } else {
                     layout = arg.layout;
                     value = arg.value;

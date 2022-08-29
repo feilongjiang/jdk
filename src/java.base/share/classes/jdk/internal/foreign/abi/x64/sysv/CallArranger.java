@@ -138,7 +138,7 @@ public class CallArranger {
             target = SharedUtils.adaptUpcallForIMR(target, true /* drop return, since we don't have bindings for it */);
         }
 
-        return UpcallLinker.make(CSysV, target, bindings.callingSequence, session, false, null, null);
+        return UpcallLinker.make(CSysV, target, bindings.callingSequence, session);
     }
 
     private static boolean isInMemoryReturn(Optional<MemoryLayout> returnLayout) {

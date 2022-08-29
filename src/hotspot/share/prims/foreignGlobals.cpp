@@ -37,24 +37,13 @@ const CallRegs ForeignGlobals::parse_call_regs(jobject jconv) {
   int num_args = arg_regs_oop->length();
   int num_rets = ret_regs_oop->length();
   CallRegs result(num_args, num_rets);
-  jboolean lengthSensitive = jdk_internal_foreign_abi_CallConv::lengthSensitive(conv_oop);
-  result._length_sensitive = lengthSensitive;
+
   for (int i = 0; i < num_args; i++) {
     result._arg_regs.push(parse_vmstorage(arg_regs_oop->obj_at(i)));
   }
 
   for (int i = 0; i < num_rets; i++) {
     result._ret_regs.push(parse_vmstorage(ret_regs_oop->obj_at(i)));
-  }
-
-  if (lengthSensitive) {
-    typeArrayOop offset_oop = jdk_internal_foreign_abi_CallConv::offset(conv_oop);
-    typeArrayOop length_oop = jdk_internal_foreign_abi_CallConv::length(conv_oop);
-    assert(num_rets==offset_oop->length() && num_rets == length_oop->length(), "bad CallRegs");
-    for (int i = 0; i < num_rets ; i++){
-      result._offset.push(offset_oop->long_at(i));
-      result._length.push(length_oop->long_at(i));
-    }
   }
 
   return result;

@@ -23,18 +23,17 @@
  *
  */
 
-#include "precompiled.hpp"
 #include "asm/macroAssembler.hpp"
 #include "logging/logStream.hpp"
 #include "memory/resourceArea.hpp"
+#include "precompiled.hpp"
 #include "prims/upcallLinker.hpp"
-#include "prims/foreignGlobals.inline.hpp"
+#include "runtime/jniHandles.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/signature.hpp"
 #include "runtime/stubRoutines.hpp"
-#include "utilities/formatBuffer.hpp"
-#include "utilities/globalDefinitions.hpp"
 #include "utilities/debug.hpp"
+#include "utilities/globalDefinitions.hpp"
 
 #define __ _masm->
 
@@ -88,7 +87,7 @@ static void preserve_callee_saved_registers(MacroAssembler *_masm, const ABIDesc
 }
 
 
-static void restore_callee_saved_registers(MacroAssembler* _masm, const ABIDescriptor& abi, int reg_save_area_offset) {
+static void restore_callee_saved_registers(MacroAssembler *_masm, const ABIDescriptor &abi, int reg_save_area_offset) {
   // 1. iterate all registers in the architecture
   //     - check if they are volatile or not for the given abi
   //     - if NOT, we need to restore it here
@@ -116,7 +115,19 @@ static void restore_callee_saved_registers(MacroAssembler* _masm, const ABIDescr
   __ block_comment("} restore_callee_saved_regs ");
 }
 
+static GrowableArray<RegType> parse_reg_types(jobject jconv) {
+  oop conv_oop = JNIHandles::resolve_non_null(jconv);
+  objArrayOop ret_regs_oop = jdk_internal_foreign_abi_CallConv::retRegs(conv_oop);
+  int num_rets = ret_regs_oop->length();
+  GrowableArray<RegType> result{num_rets};
 
+  for (int i = 0; i < num_rets; i++) {
+    jint type = jdk_internal_foreign_abi_VMStorage::type(ret_regs_oop->obj_at(i));
+    result.push(static_cast<RegType>(type));
+  }
+
+  return result;
+}
 
 // receive args from c function, and convert it into java calling convetion.
 address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
@@ -278,58 +289,36 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
     // move return value from return buffer to registers.
     assert(ret_buf_offset != -1, "no return buffer allocated");
     __ la(tmp1, Address(sp, ret_buf_offset));
-    // lengthSensitive.
-    if (call_regs._length_sensitive) {
-      for (int i = 0; i < call_regs._ret_regs.length(); i++) {
-        long length = call_regs._length.at(i);
-        long offset = call_regs._offset.at(i);
-        VMReg reg = call_regs._ret_regs.at(i);
-        if (reg->is_Register()) {
-          switch (length) {
-            case 1:
-              __ lbu(reg->as_Register(), Address(tmp1, offset));
-              break;
-            case 2:
-              __ lhu(reg->as_Register(), Address(tmp1, offset));
-              break;
-            case 4:
-              __ lwu(reg->as_Register(), Address(tmp1, offset));
-              break;
-            case 8:
-              __ ld(reg->as_Register(), Address(tmp1, offset));
-              break;
-            default:
-              ShouldNotReachHere();
-          }
-        } else if (reg->is_FloatRegister()) {
-          switch (length) {
-            case 4:
-              __ flw(reg->as_FloatRegister(), Address(tmp1, offset));
-              break;
-            case 8:
-              __ fld(reg->as_FloatRegister(), Address(tmp1, offset));
-              break;
-            default:
-              ShouldNotReachHere();
-          }
-        } else {
-          ShouldNotReachHere();
-        }
-      }
-    } else{
-      int offset = 0;
-      for (int i = 0; i < call_regs._ret_regs.length(); i++) {
-        VMReg reg = call_regs._ret_regs.at(i);
-        if (reg->is_Register()) {
-          __ ld(reg->as_Register(), Address(tmp1, offset));
-          offset += 8;
-        } else if (reg->is_FloatRegister()) {
+
+    GrowableArray<RegType> storages = parse_reg_types(jconv);
+    int offset = 0;
+    assert(storages.length() == call_regs._ret_regs.length(), "inconsistent length.");
+    for (int i = 0; i < call_regs._ret_regs.length(); i++) {
+      VMReg reg = call_regs._ret_regs.at(i);
+      RegType reg_type = storages.at(i);
+      switch (reg_type) {
+        case RegType::FLOAT_32:
+          __ flw(reg->as_FloatRegister(), Address(tmp1, offset));
+          break;
+        case RegType::FLOAT_64:
           __ fld(reg->as_FloatRegister(), Address(tmp1, offset));
-          offset += 8; // needs to match FLOAT_REG_SIZE in RV64Architecture (Java)
-        } else {
+          break;
+        case RegType::INTEGER_8:
+          __ lbu(reg->as_Register(), Address(tmp1, offset));
+          break;
+        case RegType::INTEGER_16:
+          __ lhu(reg->as_Register(), Address(tmp1, offset));
+          break;
+        case RegType::INTEGER_32:
+          __ lwu(reg->as_Register(), Address(tmp1, offset));
+          break;
+        case RegType::INTEGER_64:
+          __ ld(reg->as_Register(), Address(tmp1, offset));
+          break;
+        default:
           ShouldNotReachHere();
-        }
       }
+      offset += 8;
     }
   }
 
