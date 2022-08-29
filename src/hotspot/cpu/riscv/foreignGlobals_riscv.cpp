@@ -180,7 +180,6 @@ static void move32_64(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
   }
 }
 
-// FIXME -- checkout how java abi pass a double.
 // A double move
 static void double_move(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
   assert(src.first()->is_stack() && dst.first()->is_stack() ||
@@ -270,7 +269,6 @@ static void move_double_to_integer_or_stack(MacroAssembler *_masm, VMRegPair src
     if (src.is_single_phys_reg() && dst.is_single_phys_reg()) {
       __ fmv_x_d(dst.first()->as_Register(),src.first()->as_FloatRegister());
     } else {
-      // FIXME -- this case may happen, if run out of integer register.
       ShouldNotReachHere();
     }
   }
