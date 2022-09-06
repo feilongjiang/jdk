@@ -23,16 +23,15 @@
  *
  */
 
-#include "precompiled.hpp"
 #include "asm/macroAssembler.hpp"
 #include "logging/logStream.hpp"
 #include "memory/resourceArea.hpp"
+#include "precompiled.hpp"
 #include "prims/upcallLinker.hpp"
 #include "prims/foreignGlobals.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/signature.hpp"
 #include "runtime/stubRoutines.hpp"
-#include "utilities/formatBuffer.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/debug.hpp"
 
@@ -87,7 +86,6 @@ static void preserve_callee_saved_registers(MacroAssembler *_masm, const ABIDesc
   __ block_comment("} preserve_callee_saved_regs ");
 }
 
-
 static void restore_callee_saved_registers(MacroAssembler* _masm, const ABIDescriptor& abi, int reg_save_area_offset) {
   // 1. iterate all registers in the architecture
   //     - check if they are volatile or not for the given abi
@@ -115,8 +113,6 @@ static void restore_callee_saved_registers(MacroAssembler* _masm, const ABIDescr
 
   __ block_comment("} restore_callee_saved_regs ");
 }
-
-
 
 // receive args from c function, and convert it into java calling convetion.
 address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
@@ -207,7 +203,6 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   // allocate frame (frame_size is also aligned, so stack is still aligned)
   __ sub(sp, sp, frame_size);
 
-
   // we have to always spill args since we need to do a call to get the thread
   // (and maybe attach it).
   arg_spilller.generate_spill(_masm, arg_save_area_offset);
@@ -215,12 +210,10 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
 
   __ block_comment("{ on_entry");
   __ la(c_rarg0, Address(sp, frame_data_offset));
-  __ movptr(tmp1, CAST_FROM_FN_PTR(uint64_t, UpcallLinker::on_entry));
-  __ jalr(tmp1);
+  __ rt_call(CAST_FROM_FN_PTR(address, UpcallLinker::on_entry));
   __ mv(xthread, x10);
   __ reinit_heapbase();
   __ block_comment("} on_entry");
-
 
   __ block_comment("{ argument shuffle");
   arg_spilller.generate_fill(_masm, arg_save_area_offset);
@@ -230,7 +223,6 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   }
   arg_shuffle.generate(_masm, shuffle_reg->as_VMReg(), abi._shadow_space_bytes, 0);
   __ block_comment("} argument shuffle");
-
 
   __ block_comment("{ receiver ");
   __ movptr(shuffle_reg, (intptr_t) receiver);
@@ -245,7 +237,6 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   // get entry address and do call.
   __ ld(tmp1, Address(xmethod, Method::from_compiled_offset()));
   __ jalr(tmp1);
-
 
   // return value shuffle
   if (!needs_return_buffer) {
@@ -325,7 +316,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
           offset += 8;
         } else if (reg->is_FloatRegister()) {
           __ fld(reg->as_FloatRegister(), Address(tmp1, offset));
-          offset += 8; // needs to match FLOAT_REG_SIZE in RV64Architecture (Java)
+          offset += 8; // needs to match FLOAT_REG_SIZE in RISCV64Architecture (Java)
         } else {
           ShouldNotReachHere();
         }
@@ -338,8 +329,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   __ block_comment("{ on_exit");
   __ la(c_rarg0, Address(sp, frame_data_offset));
   // stack already aligned
-  __ movptr(tmp1, CAST_FROM_FN_PTR(uint64_t, UpcallLinker::on_exit));
-  __ jalr(tmp1);
+  __ rt_call(CAST_FROM_FN_PTR(address , UpcallLinker::on_exit));
   __ block_comment("} on_exit");
 
   restore_callee_saved_registers(_masm, abi, reg_save_area_offset);
@@ -356,14 +346,11 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   // Native caller has no idea how to handle exceptions,
   // so we just crash here. Up to callee to catch exceptions.
   __ verify_oop(x10); // return a exception oop in a0
-  __ movptr(tmp1, CAST_FROM_FN_PTR(uint64_t, UpcallLinker::handle_uncaught_exception));
-  __ jalr(tmp1);
+  __ rt_call(CAST_FROM_FN_PTR(address, UpcallLinker::handle_uncaught_exception));
   __ should_not_reach_here();
 
   __ block_comment("} exception handler");
-
-  _masm->flush();
-
+  __ flush();
 
 #ifndef PRODUCT
   stringStream ss;
@@ -372,7 +359,6 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
 #else // PRODUCT
   const char* name = "upcall_stub";
 #endif // PRODUCT
-
 
   UpcallStub *blob
           = UpcallStub::create(name,

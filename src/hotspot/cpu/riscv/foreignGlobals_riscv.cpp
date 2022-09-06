@@ -23,12 +23,12 @@
  *
  */
 
-#include "precompiled.hpp"
-#include "code/vmreg.hpp"
-#include "prims/foreignGlobals.hpp"
-#include "utilities/debug.hpp"
 #include "classfile/javaClasses.hpp"
+#include "code/vmreg.hpp"
+#include "utilities/debug.hpp"
 #include "runtime/jniHandles.inline.hpp"
+#include "precompiled.hpp"
+#include "prims/foreignGlobals.hpp"
 #include "prims/foreignGlobals.inline.hpp"
 
 class MacroAssembler;
@@ -153,7 +153,6 @@ static void long_move(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
   }
 }
 
-
 // On 64 bit we will store integer like items to the stack as
 // 64 bits items (riscv64 abi) even though java would only store
 // 32bits for a parameter. On 32bit it will simply be 32 bits
@@ -227,7 +226,6 @@ static void float_move(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
     }
   }
 }
-
 
 static void move_float_to_integer_or_stack(MacroAssembler *_masm, VMRegPair src, VMRegPair dst){
   assert_cond(_masm != NULL);

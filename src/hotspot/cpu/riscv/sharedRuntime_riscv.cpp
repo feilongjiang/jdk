@@ -1017,18 +1017,6 @@ static void restore_args(MacroAssembler *masm, int arg_count, int first_arg, VMR
   }
 }
 
-static void rt_call(MacroAssembler* masm, address dest) {
-  assert_cond(masm != NULL);
-  CodeBlob *cb = CodeCache::find_blob(dest);
-  if (cb) {
-    __ far_call(RuntimeAddress(dest));
-  } else {
-    int32_t offset = 0;
-    __ la_patchable(t0, RuntimeAddress(dest), offset);
-    __ jalr(x1, t0, offset);
-  }
-}
-
 static void verify_oop_args(MacroAssembler* masm,
                             const methodHandle& method,
                             const BasicType* sig_bt,
@@ -1572,7 +1560,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   __ membar(MacroAssembler::LoadStore | MacroAssembler::StoreStore);
   __ sw(t0, Address(t1));
 
-  rt_call(masm, native_func);
+  __ rt_call(native_func);
 
   __ bind(native_return);
 
@@ -1768,7 +1756,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     __ ld(x9, Address(xthread, in_bytes(Thread::pending_exception_offset())));
     __ sd(zr, Address(xthread, in_bytes(Thread::pending_exception_offset())));
 
-    rt_call(masm, CAST_FROM_FN_PTR(address, SharedRuntime::complete_monitor_unlocking_C));
+    __ rt_call(CAST_FROM_FN_PTR(address, SharedRuntime::complete_monitor_unlocking_C));
 
 #ifdef ASSERT
     {
@@ -1795,7 +1783,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
   __ bind(reguard);
   save_native_result(masm, ret_type, stack_slots);
-  rt_call(masm, CAST_FROM_FN_PTR(address, SharedRuntime::reguard_yellow_pages));
+  __ rt_call(CAST_FROM_FN_PTR(address, SharedRuntime::reguard_yellow_pages));
   restore_native_result(masm, ret_type, stack_slots);
   // and continue
   __ j(reguard_done);

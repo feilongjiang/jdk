@@ -61,7 +61,6 @@ public:
 };
 
 
-
 class JavaCallingConvention : public CallingConventionClosure {
 public:
   int calling_convention(BasicType* sig_bt, VMRegPair* regs, int num_args) const override {
