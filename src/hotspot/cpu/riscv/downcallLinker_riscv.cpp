@@ -121,8 +121,6 @@ RuntimeStub *DowncallLinker::make_downcall_stub(BasicType *signature,
   return stub;
 }
 
-
-
 void DowncallStubGenerator::generate() {
   // ra, fp
   // unit = 32bits word
@@ -140,11 +138,9 @@ void DowncallStubGenerator::generate() {
   Register tmp1 = t0;
   Register tmp2 = t1;
 
-
-  // _input_registers就是输入的binding序列，这个序列是根据平台abi生成的。
   Register shufffle_reg = t2;
-  JavaCallingConvention in_conv; // 这里会使用到compiled代码的调用规约，但是我对此没有了解，不过好像只是进行了偏移。
-  NativeCallingConvention out_conv(_input_registers); // 根据两个调用方式的不同，会生成一段移动的代码。
+  JavaCallingConvention in_conv;
+  NativeCallingConvention out_conv(_input_registers);
   ArgumentShuffle arg_shuffle(_signature, _num_args, _signature, _num_args, &in_conv, &out_conv,
                               shufffle_reg->as_VMReg());
 
@@ -206,6 +202,7 @@ void DowncallStubGenerator::generate() {
 
   // State transition
   __ mv(tmp1, _thread_in_native);
+  __ membar(MacroAssembler::LoadStore | MacroAssembler::StoreStore);
   __ sw(tmp1, Address(xthread, JavaThread::thread_state_offset()));
   __ block_comment("} thread java2native");
 
@@ -218,32 +215,12 @@ void DowncallStubGenerator::generate() {
   }
   __ block_comment("} argument shuffle");
 
-  // test it
-    __ sub(sp,sp,16);
-    __ sd(ra,Address(sp,8));
-    __ add(sp,sp,16);
-  // end
-
+  // jump to foreign funtion.
   __ jalr(_abi._target_addr_reg);
-
-
 
   if (!_needs_return_buffer) {
     // Unpack native results.
-    switch (_ret_bt) {
-      case T_BOOLEAN:
-      case T_CHAR   :
-      case T_BYTE   :
-      case T_SHORT  :
-      case T_INT    :
-        __ cast_primitive_type(_ret_bt, c_rarg0);
-        break;
-      case T_LONG   : /* nothing to do */        break;
-      case T_VOID   : /* nothing to do */        break;
-      case T_FLOAT  : /* nothing to do */        break;
-      case T_DOUBLE : /* nothing to do */        break;
-      default: ShouldNotReachHere();
-    }
+    __ cast_primitive_type(_ret_bt, c_rarg0);
   } else {
     assert(ret_buf_addr_sp_offset != -1, "no return buffer addr spill");
     __ ld(tmp1, Address(sp, ret_buf_addr_sp_offset));
@@ -268,26 +245,27 @@ void DowncallStubGenerator::generate() {
 
   __ sw(tmp1, Address(xthread, JavaThread::thread_state_offset()));
 
-  __ membar(MacroAssembler::LoadLoad | MacroAssembler::LoadStore |
-            MacroAssembler::StoreLoad | MacroAssembler::StoreStore);
+  // Force this write out before the read below
+  __ membar(MacroAssembler::AnyAny);
 
   Label L_after_safepoint_poll;
   Label L_safepoint_poll_slow_path;
   __ safepoint_poll(L_safepoint_poll_slow_path, true /* at_return */, true /* acquire */, false /* in_nmethod */);
   __ lwu(tmp1, Address(xthread, JavaThread::suspend_flags_offset()));
-  __ bne(tmp1, zr, L_safepoint_poll_slow_path);
+  __ bnez(tmp1, L_safepoint_poll_slow_path);
 
   __ bind(L_after_safepoint_poll);
 
   __ mv(tmp1, _thread_in_Java);
+  __ membar(MacroAssembler::LoadStore | MacroAssembler::StoreStore);
   __ sw(tmp1, Address(xthread, JavaThread::thread_state_offset()));
 
   __ block_comment("reguard stack check");
 
   Label L_reguard;
   Label L_after_reguard;
-  __ lwu(tmp1, Address(xthread, JavaThread::stack_guard_state_offset()));
-  __ lui(tmp2, StackOverflow::stack_guard_yellow_reserved_disabled);
+  __ lbu(tmp1, Address(xthread, JavaThread::stack_guard_state_offset()));
+  __ mv(tmp2, StackOverflow::stack_guard_yellow_reserved_disabled);
   __ beq(tmp1, tmp2, L_reguard);
   __ bind(L_after_reguard);
 
@@ -296,8 +274,6 @@ void DowncallStubGenerator::generate() {
 
   __ leave();
   __ ret();
-
-
 
   __ block_comment("{ L_safepoint_poll_slow_path");
   __ bind(L_safepoint_poll_slow_path);
@@ -308,15 +284,13 @@ void DowncallStubGenerator::generate() {
 
   __ mv(c_rarg0, xthread);
   assert(frame::arg_reg_save_area_bytes == 0, "not expecting frame reg save area");
-  __ mv(t1, CAST_FROM_FN_PTR(address, JavaThread::check_special_condition_for_native_trans));
-  __ jalr(t1);
+  __ rt_call(CAST_FROM_FN_PTR(address, JavaThread::check_special_condition_for_native_trans));
 
   if (!_needs_return_buffer) {
     out_reg_spiller.generate_fill(_masm, spill_offset);
   }
   __ j(L_after_safepoint_poll);
   __ block_comment("} L_safepoint_poll_slow_path");
-
 
   __ block_comment("{ L_reguard");
   __ bind(L_reguard);
@@ -325,9 +299,7 @@ void DowncallStubGenerator::generate() {
     out_reg_spiller.generate_spill(_masm, spill_offset);
   }
 
-  __ mv(t1, CAST_FROM_FN_PTR(address, SharedRuntime::reguard_yellow_pages));
-  __ jalr(t1);
-
+  __ rt_call(CAST_FROM_FN_PTR(address, SharedRuntime::reguard_yellow_pages));
 
   if (!_needs_return_buffer) {
     out_reg_spiller.generate_fill(_masm, spill_offset);

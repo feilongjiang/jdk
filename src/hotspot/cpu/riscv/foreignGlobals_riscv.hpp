@@ -53,14 +53,15 @@ enum class RegType {
   INTEGER = 0,
   FLOAT = 1,
   STACK = 2,
+};
 
-  // For encode length message, not a real register type.
-  INTEGER_8 = 3,
-  INTEGER_16 = 4,
-  INTEGER_32 = 5,
-  INTEGER_64 = 6,
-  FLOAT_32 = 7,
-  FLOAT_64 = 8,
+enum class StorageClass {
+    INTEGER_8 = 3,
+    INTEGER_16 = 4,
+    INTEGER_32 = 5,
+    INTEGER_64 = 6,
+    FLOAT_32 = 7,
+    FLOAT_64 = 8,
 };
 
 #endif // CPU_RISCV_FOREIGN_GLOBALS_RISCV_HPP

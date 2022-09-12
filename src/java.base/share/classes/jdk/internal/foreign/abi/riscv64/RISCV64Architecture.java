@@ -37,8 +37,8 @@ public class RISCV64Architecture implements Architecture {
     private static final int FLOAT_REG_SIZE = 8;
     private static final int STACK_SLOT_SIZE = 8;
 
-    // While allocating, should use AllocationClass.
-    public interface AllocationClasses {
+    // While allocating, should use RegTypes.
+    public interface RegTypes {
         int INTEGER = 0;
         int FLOAT = 1;
         int STACK = 2;
@@ -142,31 +142,31 @@ public class RISCV64Architecture implements Architecture {
     public static final VMStorage f31 = floatRegister(31, "ft11");    // ft11
 
     private static VMStorage integerRegister(int index, String debugName) {
-        return new VMStorage(AllocationClasses.INTEGER, index, debugName);
+        return new VMStorage(RegTypes.INTEGER, index, debugName);
     }
 
     private static VMStorage floatRegister(int index, String debugName) {
-        return new VMStorage(AllocationClasses.FLOAT, index, debugName);
+        return new VMStorage(RegTypes.FLOAT, index, debugName);
     }
 
     public static VMStorage stackStorage(int index) {
-        return new VMStorage(AllocationClasses.STACK, index, "Stack@" + index);
+        return new VMStorage(RegTypes.STACK, index, "Stack@" + index);
     }
 
     @Override
     public boolean isStackType(int cls) {
-        return cls == AllocationClasses.STACK;
+        return cls == RegTypes.STACK;
     }
 
     @Override
     public int typeSize(int cls) {
         switch (cls) {
-            case AllocationClasses.INTEGER, StorageClasses.INTEGER_8, StorageClasses.INTEGER_16,
+            case RegTypes.INTEGER, StorageClasses.INTEGER_8, StorageClasses.INTEGER_16,
                     StorageClasses.INTEGER_32, StorageClasses.INTEGER_64:
                 return INTEGER_REG_SIZE;
-            case AllocationClasses.FLOAT, StorageClasses.FLOAT_32, StorageClasses.FLOAT_64:
+            case RegTypes.FLOAT, StorageClasses.FLOAT_32, StorageClasses.FLOAT_64:
                 return FLOAT_REG_SIZE;
-            case AllocationClasses.STACK:
+            case RegTypes.STACK:
                 return STACK_SLOT_SIZE;
         }
         throw new IllegalArgumentException("Invalid Storage Class: " + cls);
@@ -174,7 +174,7 @@ public class RISCV64Architecture implements Architecture {
 
     @Override
     public int stackType() {
-        return AllocationClasses.STACK;
+        return RegTypes.STACK;
     }
 
     public static ABIDescriptor abiFor(VMStorage[] inputIntRegs, VMStorage[] inputFloatRegs, VMStorage[] outputIntRegs,

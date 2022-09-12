@@ -57,7 +57,7 @@ public class CallArranger {
     // In fact, registers with the same index are the same registers.
     // Because VMStorage.type can encode length message.
     static Map.Entry<Integer, VMStorage[]> buildStorageEntry(int storageClass, VMStorage[][] storagePrototypes) {
-        VMStorage[] prototypes = storagePrototypes[allocateType(storageClass)];
+        VMStorage[] prototypes = storagePrototypes[regType(storageClass)];
         VMStorage[] result = new VMStorage[prototypes.length];
         for (int i = 0; i < prototypes.length; i++) {
             result[i] = new VMStorage(storageClass, prototypes[i].index(), prototypes[i].name());
@@ -84,11 +84,11 @@ public class CallArranger {
             buildStorageEntry(StorageClasses.FLOAT_64, CLinux.outputStorage)
     );
 
-    static int allocateType(int storageClass) {
+    static int regType(int storageClass) {
         return switch (storageClass) {
-            case StorageClasses.FLOAT_32, StorageClasses.FLOAT_64 -> AllocationClasses.FLOAT;
+            case StorageClasses.FLOAT_32, StorageClasses.FLOAT_64 -> RegTypes.FLOAT;
             case StorageClasses.INTEGER_8, StorageClasses.INTEGER_16,
-                    StorageClasses.INTEGER_32, StorageClasses.INTEGER_64 -> AllocationClasses.INTEGER;
+                    StorageClasses.INTEGER_32, StorageClasses.INTEGER_64 -> RegTypes.INTEGER;
             default -> -1;
         };
     }
@@ -179,7 +179,7 @@ public class CallArranger {
         }
 
         Optional<VMStorage> regAlloc(int storageType) {
-            int allocateType = allocateType(storageType);
+            int allocateType = regType(storageType);
             var availableRegs = MAX_REGISTER_ARGUMENTS - nRegs[allocateType];
             if (availableRegs > 0) {
                 VMStorage[] source =
@@ -196,9 +196,9 @@ public class CallArranger {
         VMStorage getStorage(int storageClass) {
             Optional<VMStorage> storage = regAlloc(storageClass);
             if (storage.isPresent()) return storage.get();
-            // If storageClass is AllocationClasses.FLOAT, and no floating-point register is available,
+            // If storageClass is RegTypes.FLOAT, and no floating-point register is available,
             // try to allocate an integer register.
-            if (allocateType(storageClass) == AllocationClasses.FLOAT) {
+            if (regType(storageClass) == RegTypes.FLOAT) {
                 storage = regAlloc(StorageClasses.toIntegerClass(storageClass));
                 if (storage.isPresent()) return storage.get();
             }
@@ -216,8 +216,8 @@ public class CallArranger {
         }
 
         boolean availableRegs(int integerReg, int floatReg) {
-            return nRegs[AllocationClasses.INTEGER] + integerReg <= StorageCalculator.MAX_REGISTER_ARGUMENTS &&
-                    nRegs[AllocationClasses.FLOAT] + floatReg <= StorageCalculator.MAX_REGISTER_ARGUMENTS;
+            return nRegs[RegTypes.INTEGER] + integerReg <= StorageCalculator.MAX_REGISTER_ARGUMENTS &&
+                    nRegs[RegTypes.FLOAT] + floatReg <= StorageCalculator.MAX_REGISTER_ARGUMENTS;
         }
 
         @Override
@@ -330,7 +330,7 @@ public class CallArranger {
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = allocateType(storage.type()) == AllocationClasses.FLOAT;
+                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
                         Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
                         if (offset + copy < layout.byteSize()) {
                             bindings.dup();
@@ -432,7 +432,7 @@ public class CallArranger {
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = allocateType(storage.type()) == AllocationClasses.FLOAT;
+                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
                         Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
                         bindings.dup().vmLoad(storage, type)
                                 .bufferStore(offset, type);

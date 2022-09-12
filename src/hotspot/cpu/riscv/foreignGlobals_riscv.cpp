@@ -63,23 +63,37 @@ const ABIDescriptor ForeignGlobals::parse_abi_descriptor(jobject jabi) {
   return abi;
 }
 
+static RegType get_regtype(int regtype_or_storageclass) {
+  if (regtype_or_storageclass <= static_cast<int>(RegType::STACK)) {
+    return static_cast<RegType>(regtype_or_storageclass);
+  }
+
+  switch (static_cast<StorageClass>(regtype_or_storageclass)) {
+    case StorageClass::INTEGER_8:
+    case StorageClass::INTEGER_16:
+    case StorageClass::INTEGER_32:
+    case StorageClass::INTEGER_64:
+      return RegType::INTEGER;
+    case StorageClass::FLOAT_32:
+    case StorageClass::FLOAT_64:
+      return RegType::FLOAT;
+    default:
+      ShouldNotReachHere();
+      return static_cast<RegType>(-1);
+  }
+}
+
 VMReg ForeignGlobals::vmstorage_to_vmreg(int type, int index) {
-  switch (static_cast<RegType>(type)) {
+  switch (get_regtype(type)) {
     case RegType::INTEGER:
-    case RegType::INTEGER_8:
-    case RegType::INTEGER_16:
-    case RegType::INTEGER_32:
-    case RegType::INTEGER_64:
       return ::as_Register(index)->as_VMReg();
     case RegType::FLOAT:
-    case RegType::FLOAT_32:
-    case RegType::FLOAT_64:
       return ::as_FloatRegister(index)->as_VMReg();
     case RegType::STACK:
-      return VMRegImpl::stack2reg(index LP64_ONLY(*2)); // numbering on x64 goes per 64-bits
+      return VMRegImpl::stack2reg(index LP64_ONLY(*2));
+    default:
+      return VMRegImpl::Bad();
   }
-  // unsupport stack storage.
-  return VMRegImpl::Bad();
 }
 
 int RegSpiller::pd_reg_size(VMReg reg) {
@@ -100,7 +114,6 @@ void RegSpiller::pd_store_reg(MacroAssembler *masm, int offset, VMReg reg) {
   } else {
     // stack and BAD
   }
-
 }
 
 void RegSpiller::pd_load_reg(MacroAssembler *masm, int offset, VMReg reg) {
@@ -111,7 +124,6 @@ void RegSpiller::pd_load_reg(MacroAssembler *masm, int offset, VMReg reg) {
   } else {
     // stack and BAD
   }
-
 }
 
 
@@ -152,7 +164,6 @@ static void long_move(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
     }
   }
 }
-
 
 // On 64 bit we will store integer like items to the stack as
 // 64 bits items (riscv64 abi) even though java would only store
@@ -227,7 +238,6 @@ static void float_move(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
     }
   }
 }
-
 
 static void move_float_to_integer_or_stack(MacroAssembler *_masm, VMRegPair src, VMRegPair dst){
   assert_cond(_masm != NULL);

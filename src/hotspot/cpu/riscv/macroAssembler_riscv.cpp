@@ -3977,3 +3977,14 @@ void MacroAssembler::cmp_l2i(Register dst, Register src1, Register src2, Registe
   neg(dst, dst);
   bind(done);
 }
+
+void MacroAssembler::rt_call(address dest) {
+  CodeBlob *cb = CodeCache::find_blob(dest);
+  if (cb) {
+    far_call(RuntimeAddress(dest));
+  } else {
+    int32_t offset = 0;
+    la_patchable(t0, RuntimeAddress(dest), offset);
+    jalr(x1, t0, offset);
+  }
+}

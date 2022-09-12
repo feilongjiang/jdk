@@ -86,8 +86,7 @@ static void preserve_callee_saved_registers(MacroAssembler *_masm, const ABIDesc
   __ block_comment("} preserve_callee_saved_regs ");
 }
 
-
-static void restore_callee_saved_registers(MacroAssembler *_masm, const ABIDescriptor &abi, int reg_save_area_offset) {
+static void restore_callee_saved_registers(MacroAssembler* _masm, const ABIDescriptor& abi, int reg_save_area_offset) {
   // 1. iterate all registers in the architecture
   //     - check if they are volatile or not for the given abi
   //     - if NOT, we need to restore it here
@@ -115,15 +114,15 @@ static void restore_callee_saved_registers(MacroAssembler *_masm, const ABIDescr
   __ block_comment("} restore_callee_saved_regs ");
 }
 
-static GrowableArray<RegType> parse_reg_types(jobject jconv) {
+static GrowableArray<StorageClass> parse_reg_types(jobject jconv) {
   oop conv_oop = JNIHandles::resolve_non_null(jconv);
   objArrayOop ret_regs_oop = jdk_internal_foreign_abi_CallConv::retRegs(conv_oop);
   int num_rets = ret_regs_oop->length();
-  GrowableArray<RegType> result{num_rets};
-
+  GrowableArray<StorageClass> result{num_rets};
   for (int i = 0; i < num_rets; i++) {
     jint type = jdk_internal_foreign_abi_VMStorage::type(ret_regs_oop->obj_at(i));
-    result.push(static_cast<RegType>(type));
+    assert(type >= static_cast<int>(StorageClass::INTEGER_8), "bad storage class.");
+    result.push(static_cast<StorageClass>(type));
   }
 
   return result;
@@ -218,7 +217,6 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   // allocate frame (frame_size is also aligned, so stack is still aligned)
   __ sub(sp, sp, frame_size);
 
-
   // we have to always spill args since we need to do a call to get the thread
   // (and maybe attach it).
   arg_spilller.generate_spill(_masm, arg_save_area_offset);
@@ -226,12 +224,10 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
 
   __ block_comment("{ on_entry");
   __ la(c_rarg0, Address(sp, frame_data_offset));
-  __ movptr(tmp1, CAST_FROM_FN_PTR(uint64_t, UpcallLinker::on_entry));
-  __ jalr(tmp1);
+  __ rt_call(CAST_FROM_FN_PTR(address, UpcallLinker::on_entry));
   __ mv(xthread, x10);
   __ reinit_heapbase();
   __ block_comment("} on_entry");
-
 
   __ block_comment("{ argument shuffle");
   arg_spilller.generate_fill(_masm, arg_save_area_offset);
@@ -241,7 +237,6 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   }
   arg_shuffle.generate(_masm, shuffle_reg->as_VMReg(), abi._shadow_space_bytes, 0);
   __ block_comment("} argument shuffle");
-
 
   __ block_comment("{ receiver ");
   __ movptr(shuffle_reg, (intptr_t) receiver);
@@ -256,7 +251,6 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   // get entry address and do call.
   __ ld(tmp1, Address(xmethod, Method::from_compiled_offset()));
   __ jalr(tmp1);
-
 
   // return value shuffle
   if (!needs_return_buffer) {
@@ -290,29 +284,29 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
     assert(ret_buf_offset != -1, "no return buffer allocated");
     __ la(tmp1, Address(sp, ret_buf_offset));
 
-    GrowableArray<RegType> storages = parse_reg_types(jconv);
+    GrowableArray<StorageClass> storages = parse_reg_types(jconv);
     int offset = 0;
     assert(storages.length() == call_regs._ret_regs.length(), "inconsistent length.");
     for (int i = 0; i < call_regs._ret_regs.length(); i++) {
       VMReg reg = call_regs._ret_regs.at(i);
-      RegType reg_type = storages.at(i);
-      switch (reg_type) {
-        case RegType::FLOAT_32:
+      StorageClass regtype = storages.at(i);
+      switch (regtype) {
+        case StorageClass::FLOAT_32:
           __ flw(reg->as_FloatRegister(), Address(tmp1, offset));
           break;
-        case RegType::FLOAT_64:
+        case StorageClass::FLOAT_64:
           __ fld(reg->as_FloatRegister(), Address(tmp1, offset));
           break;
-        case RegType::INTEGER_8:
-          __ lbu(reg->as_Register(), Address(tmp1, offset));
+        case StorageClass::INTEGER_8:
+          __ lb(reg->as_Register(), Address(tmp1, offset));
           break;
-        case RegType::INTEGER_16:
-          __ lhu(reg->as_Register(), Address(tmp1, offset));
+        case StorageClass::INTEGER_16:
+          __ lh(reg->as_Register(), Address(tmp1, offset));
           break;
-        case RegType::INTEGER_32:
-          __ lwu(reg->as_Register(), Address(tmp1, offset));
+        case StorageClass::INTEGER_32:
+          __ lw(reg->as_Register(), Address(tmp1, offset));
           break;
-        case RegType::INTEGER_64:
+        case StorageClass::INTEGER_64:
           __ ld(reg->as_Register(), Address(tmp1, offset));
           break;
         default:
@@ -327,8 +321,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   __ block_comment("{ on_exit");
   __ la(c_rarg0, Address(sp, frame_data_offset));
   // stack already aligned
-  __ movptr(tmp1, CAST_FROM_FN_PTR(uint64_t, UpcallLinker::on_exit));
-  __ jalr(tmp1);
+  __ rt_call(CAST_FROM_FN_PTR(address , UpcallLinker::on_exit));
   __ block_comment("} on_exit");
 
   restore_callee_saved_registers(_masm, abi, reg_save_area_offset);
@@ -345,14 +338,11 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   // Native caller has no idea how to handle exceptions,
   // so we just crash here. Up to callee to catch exceptions.
   __ verify_oop(x10); // return a exception oop in a0
-  __ movptr(tmp1, CAST_FROM_FN_PTR(uint64_t, UpcallLinker::handle_uncaught_exception));
-  __ jalr(tmp1);
+  __ rt_call(CAST_FROM_FN_PTR(address, UpcallLinker::handle_uncaught_exception));
   __ should_not_reach_here();
 
   __ block_comment("} exception handler");
-
-  _masm->flush();
-
+  __ flush();
 
 #ifndef PRODUCT
   stringStream ss;
@@ -361,7 +351,6 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
 #else // PRODUCT
   const char* name = "upcall_stub";
 #endif // PRODUCT
-
 
   UpcallStub *blob
           = UpcallStub::create(name,

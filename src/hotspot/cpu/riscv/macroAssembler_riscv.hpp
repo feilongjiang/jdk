@@ -795,6 +795,9 @@ class MacroAssembler: public Assembler {
   void vncvt_x_x_w(VectorRegister vd, VectorRegister vs, VectorMask vm = unmasked);
   void vfneg_v(VectorRegister vd, VectorRegister vs);
 
+  // rt_call
+  void rt_call(address dest);
+
 private:
 
 #ifdef ASSERT
