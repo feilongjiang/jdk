@@ -22,6 +22,7 @@
  * questions.
  *
  */
+
 package jdk.internal.foreign.abi.riscv64.linux;
 
 import jdk.internal.foreign.PlatformLayouts;
@@ -455,4 +456,3 @@ public class CallArranger {
         }
     }
 }
-

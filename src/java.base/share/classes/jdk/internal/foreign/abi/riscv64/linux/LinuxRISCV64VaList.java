@@ -22,6 +22,7 @@
  * questions.
  *
  */
+
 package jdk.internal.foreign.abi.riscv64.linux;
 
 import jdk.internal.foreign.MemorySessionImpl;
@@ -256,5 +257,3 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
     }
 
 }
-
-
