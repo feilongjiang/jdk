@@ -42,6 +42,7 @@ class DowncallStubGenerator : public StubCodeGenerator {
 
     const ABIDescriptor &_abi;
     const GrowableArray<VMReg> &_input_registers;
+    // output_registers is which carry return value from native function.
     const GrowableArray<VMReg> &_output_registers;
 
     bool _needs_return_buffer;
@@ -155,6 +156,8 @@ void DowncallStubGenerator::generate() {
 
   int allocated_frame_size = 0;
   if (_needs_return_buffer) {
+    // when perform downcall, only pointer to return buffer be saved in the stack.
+    // return buffer length will be determined by total size of vmstorages.
     allocated_frame_size += 8; // store address
   }
   allocated_frame_size += arg_shuffle.out_arg_stack_slots() << LogBytesPerInt;
@@ -219,9 +222,12 @@ void DowncallStubGenerator::generate() {
   __ jalr(_abi._target_addr_reg);
 
   if (!_needs_return_buffer) {
-    // Unpack native results.
+    // Unpack native results, convert native results into java value.
+    // results still in registers, so when in slow path, it must be spilled.
     __ cast_primitive_type(_ret_bt, c_rarg0);
   } else {
+    // when use return buffer, copy content of return registers to return buffer,
+    // then operations created in BoxBindingCalculator will be operated.
     assert(ret_buf_addr_sp_offset != -1, "no return buffer addr spill");
     __ ld(tmp1, Address(sp, ret_buf_addr_sp_offset));
     int offset = 0;

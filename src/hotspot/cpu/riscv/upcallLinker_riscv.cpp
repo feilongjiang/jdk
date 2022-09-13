@@ -173,6 +173,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   int res_save_area_offset = shuffle_area_offset + out_arg_area;
   int arg_save_area_offset = res_save_area_offset + result_spiller.spill_size_bytes();
   int reg_save_area_offset = arg_save_area_offset + arg_spilller.spill_size_bytes();
+  // build FrameData for stack traverse.
   int frame_data_offset = reg_save_area_offset + reg_save_area_size;
   int frame_bottom_offset = frame_data_offset + sizeof(UpcallStub::FrameData);
 
@@ -198,13 +199,13 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   //      |---------------------| = frame_data_offset
   //      |                     |
   //      | reg_save_area       |
-  //      |---------------------| = reg_save_are_offset
+  //      |---------------------| = reg_save_area_offset
   //      |                     |
   //      | arg_save_area       |
-  //      |---------------------| = arg_save_are_offset
+  //      |---------------------| = arg_save_area_offset
   //      |                     |
   //      | res_save_area       |
-  //      |---------------------| = res_save_are_offset
+  //      |---------------------| = res_save_area_offset
   //      |                     |
   // SP-> | out_arg_area        |   needs to be at end for shadow space
   //
@@ -218,7 +219,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   __ sub(sp, sp, frame_size);
 
   // we have to always spill args since we need to do a call to get the thread
-  // (and maybe attach it).
+  // (and maybe attach it). so store those registers temporarily.
   arg_spilller.generate_spill(_masm, arg_save_area_offset);
   preserve_callee_saved_registers(_masm, abi, reg_save_area_offset);
 
@@ -230,14 +231,18 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   __ block_comment("} on_entry");
 
   __ block_comment("{ argument shuffle");
+  // before shuffle, restore registers.
   arg_spilller.generate_fill(_masm, arg_save_area_offset);
   if (needs_return_buffer) {
     assert(ret_buf_offset != -1, "no return buffer allocated");
     __ la(abi._ret_buf_addr_reg, Address(sp, ret_buf_offset));
   }
+  // arg_shuffle will generate shuffle code that is used to
+  // to check how argument shuffle works, use -Xlog:foreign+upcall=trace.
   arg_shuffle.generate(_masm, shuffle_reg->as_VMReg(), abi._shadow_space_bytes, 0);
   __ block_comment("} argument shuffle");
 
+  // move the receiver to j_rarg0.
   __ block_comment("{ receiver ");
   __ movptr(shuffle_reg, (intptr_t) receiver);
   __ resolve_jobject(shuffle_reg, xthread, tmp2);
@@ -362,7 +367,6 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   if (TraceOptimizedUpcallStubs) {
     blob->print_on(tty);
   }
-
 
   return blob->code_begin();
 }
