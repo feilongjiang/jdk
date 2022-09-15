@@ -36,28 +36,28 @@
 #define __ _masm->
 
 class DowncallStubGenerator : public StubCodeGenerator {
-    BasicType *_signature;
+    BasicType* _signature;
     int _num_args;
     BasicType _ret_bt;
 
-    const ABIDescriptor &_abi;
-    const GrowableArray<VMReg> &_input_registers;
+    const ABIDescriptor& _abi;
+    const GrowableArray<VMReg>& _input_registers;
     // output_registers is which carry return value from native function.
-    const GrowableArray<VMReg> &_output_registers;
+    const GrowableArray<VMReg>& _output_registers;
 
     bool _needs_return_buffer;
 
     int _frame_complete;
     int _framesize;
-    OopMapSet *_oop_maps;
+    OopMapSet* _oop_maps;
 public:
-    DowncallStubGenerator(CodeBuffer *buffer,
-                          BasicType *signature,
+    DowncallStubGenerator(CodeBuffer* buffer,
+                          BasicType* signature,
                           int num_args,
                           BasicType ret_bt,
-                          const ABIDescriptor &abi,
-                          const GrowableArray<VMReg> &input_registers,
-                          const GrowableArray<VMReg> &output_registers,
+                          const ABIDescriptor& abi,
+                          const GrowableArray<VMReg>& input_registers,
+                          const GrowableArray<VMReg>& output_registers,
                           bool needs_return_buffer)
             : StubCodeGenerator(buffer, PrintMethodHandleStubs),
               _signature(signature),
@@ -82,19 +82,19 @@ public:
       return (_framesize >> (LogBytesPerWord - LogBytesPerInt));
     }
 
-    OopMapSet *oop_maps() const {
+    OopMapSet* oop_maps() const {
       return _oop_maps;
     }
 };
 
 static const int native_invoker_code_size = 1024;
 
-RuntimeStub *DowncallLinker::make_downcall_stub(BasicType *signature,
+RuntimeStub* DowncallLinker::make_downcall_stub(BasicType* signature,
                                                 int num_args,
                                                 BasicType ret_bt,
-                                                const ABIDescriptor &abi,
-                                                const GrowableArray<VMReg> &input_registers,
-                                                const GrowableArray<VMReg> &output_registers,
+                                                const ABIDescriptor& abi,
+                                                const GrowableArray<VMReg>& input_registers,
+                                                const GrowableArray<VMReg>& output_registers,
                                                 bool needs_return_buffer) {
   int locs_size = 64;
   CodeBuffer code("nep_invoker_blob", native_invoker_code_size, locs_size);
@@ -103,7 +103,7 @@ RuntimeStub *DowncallLinker::make_downcall_stub(BasicType *signature,
   g.generate();
   code.log_section_sizes("nep_invoker_blob");
 
-  RuntimeStub *stub =
+  RuntimeStub* stub =
           RuntimeStub::new_runtime_stub("nep_invoker_blob",
                                         &code,
                                         g.frame_complete(),
@@ -200,7 +200,7 @@ void DowncallStubGenerator::generate() {
 
   __ block_comment("{ thread java2native");
   __ set_last_Java_frame(sp, fp, the_pc, tmp1);
-  OopMap *map = new OopMap(_framesize, 0);
+  OopMap* map = new OopMap(_framesize, 0);
   _oop_maps->add_gc_map(the_pc - start, map);
 
   // State transition
@@ -236,7 +236,7 @@ void DowncallStubGenerator::generate() {
       if (reg->is_Register()) {
         __ sd(reg->as_Register(), Address(tmp1, offset));
         offset += 8;
-      } else if(reg->is_FloatRegister()) {
+      } else if (reg->is_FloatRegister()) {
         __ fsd(reg->as_FloatRegister(), Address(tmp1, offset));
         offset += 8;
       } else {

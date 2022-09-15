@@ -38,7 +38,7 @@
 #define __ _masm->
 
 // for callee saved regs, according to the caller's ABI
-static int compute_reg_save_area_size(const ABIDescriptor &abi) {
+static int compute_reg_save_area_size(const ABIDescriptor& abi) {
   int size = 0;
   for (int i = 0; i < RegisterImpl::number_of_registers; i++) {
     Register reg = as_Register(i);
@@ -58,7 +58,7 @@ static int compute_reg_save_area_size(const ABIDescriptor &abi) {
   return size;
 }
 
-static void preserve_callee_saved_registers(MacroAssembler *_masm, const ABIDescriptor &abi, int reg_save_area_offset) {
+static void preserve_callee_saved_registers(MacroAssembler* _masm, const ABIDescriptor& abi, int reg_save_area_offset) {
   // 1. iterate all registers in the architecture
   //     - check if they are volatile or not for the given abi
   //     - if NOT, we need to save it here
@@ -129,9 +129,9 @@ static GrowableArray<StorageClass> parse_reg_types(jobject jconv) {
 }
 
 // receive args from c function, and convert it into java calling convetion.
-address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
-                                       BasicType *in_sig_bt, int total_in_args,
-                                       BasicType *out_sig_bt, int total_out_args,
+address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
+                                       BasicType* in_sig_bt, int total_in_args,
+                                       BasicType* out_sig_bt, int total_out_args,
                                        BasicType ret_type,
                                        jobject jabi, jobject jconv,
                                        bool needs_return_buffer, int ret_buf_size) {
@@ -152,7 +152,6 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   int stack_slots = SharedRuntime::out_preserve_stack_slots() + arg_shuffle.out_arg_stack_slots();
   int out_arg_area = align_up(stack_slots * VMRegImpl::stack_slot_size, StackAlignmentInBytes);
 
-
 #ifndef PRODUCT
   LogTarget(Trace, foreign, upcall) lt;
   if (lt.is_enabled()) {
@@ -161,6 +160,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
     arg_shuffle.print_on(&ls);
   }
 #endif
+
   if (out_arg_area < frame::arg_reg_save_area_bytes) {
     out_arg_area = frame::arg_reg_save_area_bytes;
   }
@@ -211,7 +211,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   //
   //
 
-  MacroAssembler *_masm = new MacroAssembler(&buffer);
+  MacroAssembler* _masm = new MacroAssembler(&buffer);
   address start = __ pc();
   __ enter(); // set up frame
   assert((abi._stack_alignment_bytes % 16) == 0, "must be 16 byte aligned");
@@ -326,7 +326,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   __ block_comment("{ on_exit");
   __ la(c_rarg0, Address(sp, frame_data_offset));
   // stack already aligned
-  __ rt_call(CAST_FROM_FN_PTR(address , UpcallLinker::on_exit));
+  __ rt_call(CAST_FROM_FN_PTR(address, UpcallLinker::on_exit));
   __ block_comment("} on_exit");
 
   restore_callee_saved_registers(_masm, abi, reg_save_area_offset);
@@ -357,7 +357,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method *entry,
   const char* name = "upcall_stub";
 #endif // PRODUCT
 
-  UpcallStub *blob
+  UpcallStub* blob
           = UpcallStub::create(name,
                                &buffer,
                                exception_handler_offset,

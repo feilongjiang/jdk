@@ -36,7 +36,6 @@ class MacroAssembler;
 static constexpr int INTEGER_TYPE = 0;
 static constexpr int FLOAT_TYPE = 1;
 
-
 const ABIDescriptor ForeignGlobals::parse_abi_descriptor(jobject jabi) {
   oop abi_oop = JNIHandles::resolve_non_null(jabi);
   ABIDescriptor abi;
@@ -106,7 +105,7 @@ int RegSpiller::pd_reg_size(VMReg reg) {
 }
 
 // pd_* are used to perfrom upcall, do not impelment them now.
-void RegSpiller::pd_store_reg(MacroAssembler *masm, int offset, VMReg reg) {
+void RegSpiller::pd_store_reg(MacroAssembler* masm, int offset, VMReg reg) {
   if (reg->is_Register()) {
     masm->sd(reg->as_Register(), Address(sp, offset));
   } else if (reg->is_FloatRegister()) {
@@ -116,7 +115,7 @@ void RegSpiller::pd_store_reg(MacroAssembler *masm, int offset, VMReg reg) {
   }
 }
 
-void RegSpiller::pd_load_reg(MacroAssembler *masm, int offset, VMReg reg) {
+void RegSpiller::pd_load_reg(MacroAssembler* masm, int offset, VMReg reg) {
   if (reg->is_Register()) {
     masm->ld(reg->as_Register(), Address(sp, offset));
   } else if (reg->is_FloatRegister()) {
@@ -125,7 +124,6 @@ void RegSpiller::pd_load_reg(MacroAssembler *masm, int offset, VMReg reg) {
     // stack and BAD
   }
 }
-
 
 // The java_calling_convention describes stack locations as ideal slots on
 // a frame with no abi restrictions. Since we must observe abi restrictions
@@ -144,7 +142,7 @@ static int reg2offset_out(VMReg r) {
 #define __ _masm->
 
 // A long move
-static void long_move(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
+static void long_move(MacroAssembler* _masm, VMRegPair src, VMRegPair dst) {
   assert_cond(_masm != NULL);
   if (src.first()->is_stack()) {
     if (dst.first()->is_stack()) {
@@ -169,7 +167,7 @@ static void long_move(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
 // 64 bits items (riscv64 abi) even though java would only store
 // 32bits for a parameter. On 32bit it will simply be 32 bits
 // So this routine will do 32->32 on 32bit and 32->64 on 64bit
-static void move32_64(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
+static void move32_64(MacroAssembler* _masm, VMRegPair src, VMRegPair dst) {
   assert_cond(_masm != NULL);
   if (src.first()->is_stack()) {
     if (dst.first()->is_stack()) {
@@ -192,7 +190,7 @@ static void move32_64(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
 }
 
 // A double move
-static void double_move(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
+static void double_move(MacroAssembler* _masm, VMRegPair src, VMRegPair dst) {
   assert(src.first()->is_stack() && dst.first()->is_stack() ||
          src.first()->is_reg() && dst.first()->is_reg() || src.first()->is_stack() && dst.first()->is_reg(),
          "Unexpected error");
@@ -216,7 +214,7 @@ static void double_move(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
 }
 
 // A float arg may have to do float reg int reg conversion
-static void float_move(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
+static void float_move(MacroAssembler* _masm, VMRegPair src, VMRegPair dst) {
   assert(src.first()->is_stack() && dst.first()->is_stack() ||
          src.first()->is_reg() && dst.first()->is_reg() || src.first()->is_stack() && dst.first()->is_reg(),
          "Unexpected error");
@@ -239,7 +237,7 @@ static void float_move(MacroAssembler *_masm, VMRegPair src, VMRegPair dst) {
   }
 }
 
-static void move_float_to_integer_or_stack(MacroAssembler *_masm, VMRegPair src, VMRegPair dst){
+static void move_float_to_integer_or_stack(MacroAssembler* _masm, VMRegPair src, VMRegPair dst) {
   assert_cond(_masm != NULL);
 
   if (src.first()->is_stack()) {
@@ -255,16 +253,15 @@ static void move_float_to_integer_or_stack(MacroAssembler *_masm, VMRegPair src,
     // java abi will not use integer reg to pass a float.
     if (src.first()->is_FloatRegister()) {
       if (dst.first()->is_Register())
-        __ fmv_x_w(dst.first()->as_Register(),src.first()->as_FloatRegister());
+        __ fmv_x_w(dst.first()->as_Register(), src.first()->as_FloatRegister());
       else
         __ fsw(src.first()->as_FloatRegister(), Address(sp, reg2offset_out(dst.first())));
     } else
       ShouldNotReachHere();
   }
-
 }
 
-static void move_double_to_integer_or_stack(MacroAssembler *_masm, VMRegPair src, VMRegPair dst){
+static void move_double_to_integer_or_stack(MacroAssembler* _masm, VMRegPair src, VMRegPair dst) {
   assert_cond(_masm != NULL);
   if (src.first()->is_stack()) {
     if (dst.first()->is_stack()) {
@@ -277,18 +274,16 @@ static void move_double_to_integer_or_stack(MacroAssembler *_masm, VMRegPair src
     }
   } else if (src.first() != dst.first()) {
     if (src.is_single_phys_reg() && dst.is_single_phys_reg()) {
-      __ fmv_x_d(dst.first()->as_Register(),src.first()->as_FloatRegister());
+      __ fmv_x_d(dst.first()->as_Register(), src.first()->as_FloatRegister());
     } else {
       ShouldNotReachHere();
     }
   }
-
 }
-
 
 #undef __
 
-void ArgumentShuffle::pd_generate(MacroAssembler *masm, VMReg tmp, int in_stk_bias, int out_stk_bias) const {
+void ArgumentShuffle::pd_generate(MacroAssembler* masm, VMReg tmp, int in_stk_bias, int out_stk_bias) const {
   Register tmp_reg = tmp->as_Register();
   for (int i = 0; i < _moves.length(); i++) {
     Move move = _moves.at(i);
@@ -306,17 +301,17 @@ void ArgumentShuffle::pd_generate(MacroAssembler *masm, VMReg tmp, int in_stk_bi
         move32_64(masm, from_vmreg, to_vmreg);
         break;
       case T_FLOAT: {
-        if (!to_vmreg.first()->is_FloatRegister()){
+        if (!to_vmreg.first()->is_FloatRegister()) {
           move_float_to_integer_or_stack(masm, from_vmreg, to_vmreg);
-        } else{
+        } else {
           float_move(masm, from_vmreg, to_vmreg);
         }
         break;
       }
       case T_DOUBLE: {
-        if (!to_vmreg.first()->is_FloatRegister()){
+        if (!to_vmreg.first()->is_FloatRegister()) {
           move_double_to_integer_or_stack(masm, from_vmreg, to_vmreg);
-        } else{
+        } else {
           double_move(masm, from_vmreg, to_vmreg);
         }
         break;
@@ -328,7 +323,6 @@ void ArgumentShuffle::pd_generate(MacroAssembler *masm, VMReg tmp, int in_stk_bi
         fatal("found in upcall args: %s", type2name(arg_bt));
     }
   }
-
 }
 
 bool ABIDescriptor::is_volatile_reg(Register reg) const {
