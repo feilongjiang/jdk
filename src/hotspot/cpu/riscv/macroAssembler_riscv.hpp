@@ -798,6 +798,14 @@ class MacroAssembler: public Assembler {
   // rt_call
   void rt_call(address dest);
 
+  void move_double_to_integer_or_stack(VMRegPair src, VMRegPair dst);
+  void move_float_to_integer_or_stack(VMRegPair src, VMRegPair dst);
+
+  void move32_64(VMRegPair src, VMRegPair dst);
+  void long_move(VMRegPair src, VMRegPair dst);
+  void double_move(VMRegPair src, VMRegPair dst);
+  void float_move(VMRegPair src, VMRegPair dst);
+
 private:
 
 #ifdef ASSERT
