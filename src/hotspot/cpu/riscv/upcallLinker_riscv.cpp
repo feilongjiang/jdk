@@ -23,10 +23,10 @@
  *
  */
 
+#include "precompiled.hpp"
 #include "asm/macroAssembler.hpp"
 #include "logging/logStream.hpp"
 #include "memory/resourceArea.hpp"
-#include "precompiled.hpp"
 #include "prims/upcallLinker.hpp"
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/sharedRuntime.hpp"

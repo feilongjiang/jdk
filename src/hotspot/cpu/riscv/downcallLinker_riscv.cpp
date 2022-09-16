@@ -23,11 +23,11 @@
  *
  */
 
+#include "precompiled.hpp"
 #include "asm/macroAssembler.hpp"
 #include "code/codeBlob.hpp"
 #include "logging/logStream.hpp"
 #include "memory/resourceArea.hpp"
-#include "precompiled.hpp"
 #include "prims/downcallLinker.hpp"
 #include "prims/foreignGlobals.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
@@ -196,9 +196,8 @@ void DowncallStubGenerator::generate() {
 
   _frame_complete = __ pc() - start; // frame build complete.
 
-  address the_pc = __ pc();
-
   __ block_comment("{ thread java2native");
+  address the_pc = __ pc();
   __ set_last_Java_frame(sp, fp, the_pc, tmp1);
   OopMap* map = new OopMap(_framesize, 0);
   _oop_maps->add_gc_map(the_pc - start, map);
@@ -246,9 +245,7 @@ void DowncallStubGenerator::generate() {
   }
 
   __ block_comment("{ thread native2java");
-
   __ mv(tmp1, _thread_in_native_trans);
-
   __ sw(tmp1, Address(xthread, JavaThread::thread_state_offset()));
 
   // Force this write out before the read below
@@ -267,7 +264,6 @@ void DowncallStubGenerator::generate() {
   __ sw(tmp1, Address(xthread, JavaThread::thread_state_offset()));
 
   __ block_comment("reguard stack check");
-
   Label L_reguard;
   Label L_after_reguard;
   __ lbu(tmp1, Address(xthread, JavaThread::stack_guard_state_offset()));
