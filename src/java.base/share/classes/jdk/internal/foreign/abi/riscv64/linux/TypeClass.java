@@ -55,7 +55,6 @@ public enum TypeClass {
     FLOAT_32,
     FLOAT_64,
     POINTER,
-    SEQUENCE,
     STRUCT_A,
     STRUCT_FA,
     STRUCT_BOTH,
@@ -183,7 +182,7 @@ public enum TypeClass {
         } else if (carrier == MemoryAddress.class) {
             return POINTER;
         } else {
-            throw new IllegalStateException("Cannot get here: " + carrier.getName());
+            throw new IllegalArgumentException("Unhandled type " + type);
         }
     }
 

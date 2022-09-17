@@ -38,9 +38,15 @@ import java.util.Optional;
 import static jdk.internal.foreign.abi.riscv64.RISCV64Architecture.*;
 import static jdk.internal.foreign.abi.riscv64.linux.TypeClass.*;
 
+/**
+ * For the RISCV64 C ABI specifically, this class uses CallingSequenceBuilder
+ * to translate a C FunctionDescriptor into a CallingSequence, which can then be turned into a MethodHandle.
+ *
+ * This includes taking care of synthetic arguments like pointers to return buffers for 'in-memory' returns.
+ */
 public class CallArranger {
     private static final int STACK_SLOT_SIZE = 8;
-
+    public static final int MAX_REGISTER_ARGUMENTS = 8;
     private static final ABIDescriptor CLinux = abiFor(
             new VMStorage[]{x10, x11, x12, x13, x14, x15, x16, x17},
             new VMStorage[]{f10, f11, f12, f13, f14, f15, f16, f17},
@@ -56,7 +62,7 @@ public class CallArranger {
 
     // Make registers as prototype, create new register with same index and name but different type.
     // In fact, registers with the same index are the same registers.
-    // Because VMStorage.type can encode length message.
+    // The field type of VMStorage can encode length information.
     static Map.Entry<Integer, VMStorage[]> buildStorageEntry(int storageClass, VMStorage[][] storagePrototypes) {
         VMStorage[] prototypes = storagePrototypes[regType(storageClass)];
         VMStorage[] result = new VMStorage[prototypes.length];
@@ -67,7 +73,7 @@ public class CallArranger {
     }
 
     // Registers be used for input arguments.
-    final static Map<Integer, VMStorage[]> inputStorage = Map.ofEntries(
+    static final Map<Integer, VMStorage[]> inputStorage = Map.ofEntries(
             buildStorageEntry(StorageClasses.INTEGER_8, CLinux.inputStorage),
             buildStorageEntry(StorageClasses.INTEGER_16, CLinux.inputStorage),
             buildStorageEntry(StorageClasses.INTEGER_32, CLinux.inputStorage),
@@ -166,7 +172,6 @@ public class CallArranger {
         // next available register index. 0=integerRegIdx, 1=floatRegIdx
         private final int[] nRegs = {0, 0};
         private long stackOffset = 0;
-        final static int MAX_REGISTER_ARGUMENTS = 8;
 
         public StorageCalculator(boolean forArguments) {
             this.forArguments = forArguments;
@@ -217,8 +222,8 @@ public class CallArranger {
         }
 
         boolean availableRegs(int integerReg, int floatReg) {
-            return nRegs[RegTypes.INTEGER] + integerReg <= StorageCalculator.MAX_REGISTER_ARGUMENTS &&
-                    nRegs[RegTypes.FLOAT] + floatReg <= StorageCalculator.MAX_REGISTER_ARGUMENTS;
+            return nRegs[RegTypes.INTEGER] + integerReg <= MAX_REGISTER_ARGUMENTS &&
+                   nRegs[RegTypes.FLOAT] + floatReg <= MAX_REGISTER_ARGUMENTS;
         }
 
         @Override
@@ -246,7 +251,7 @@ public class CallArranger {
         // Variadic arguments are passed according to the integer calling convention.
         // When handling variadic part, floating-point calling convention
         // should be converted into integer calling convention.
-        final static Map<TypeClass, TypeClass> conventionConverterMap =
+        static final Map<TypeClass, TypeClass> conventionConverterMap =
                 Map.ofEntries(Map.entry(FLOAT_32, INTEGER_32),
                               Map.entry(FLOAT_64, INTEGER_64),
                               Map.entry(STRUCT_FA, STRUCT_A),
@@ -285,6 +290,26 @@ public class CallArranger {
                     bindings.vmStore(storage, long.class);
                 }
 
+                case STRUCT_A -> {
+                    assert carrier == MemorySegment.class;
+                    VMStorage[] locations = storageCalculator.getStorages(
+                            layout);
+                    int locIndex = 0;
+                    long offset = 0;
+                    while (offset < layout.byteSize()) {
+                        final long copy = Math.min(layout.byteSize() - offset, 8);
+                        VMStorage storage = locations[locIndex++];
+                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
+                        Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
+                        if (offset + copy < layout.byteSize()) {
+                            bindings.dup();
+                        }
+                        bindings.bufferLoad(offset, type)
+                                .vmStore(storage, type);
+                        offset += copy;
+                    }
+                }
+
                 case STRUCT_FA -> {
                     assert carrier == MemorySegment.class;
                     List<FlattenedFieldDesc> descs = getFlattenedFields((GroupLayout) layout);
@@ -319,26 +344,6 @@ public class CallArranger {
                         }
                     } else {
                         return getBindings(carrier, layout, STRUCT_A);
-                    }
-                }
-
-                case STRUCT_A -> {
-                    assert carrier == MemorySegment.class;
-                    VMStorage[] locations = storageCalculator.getStorages(
-                            layout);
-                    int locIndex = 0;
-                    long offset = 0;
-                    while (offset < layout.byteSize()) {
-                        final long copy = Math.min(layout.byteSize() - offset, 8);
-                        VMStorage storage = locations[locIndex++];
-                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
-                        Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
-                        if (offset + copy < layout.byteSize()) {
-                            bindings.dup();
-                        }
-                        bindings.bufferLoad(offset, type)
-                                .vmStore(storage, type);
-                        offset += copy;
                     }
                 }
 
@@ -386,6 +391,24 @@ public class CallArranger {
                             .boxAddress();
                 }
 
+                case STRUCT_A -> {
+                    assert carrier == MemorySegment.class;
+                    bindings.allocate(layout);
+                    VMStorage[] locations = storageCalculator.getStorages(
+                            layout);
+                    int locIndex = 0;
+                    long offset = 0;
+                    while (offset < layout.byteSize()) {
+                        final long copy = Math.min(layout.byteSize() - offset, 8);
+                        VMStorage storage = locations[locIndex++];
+                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
+                        Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
+                        bindings.dup().vmLoad(storage, type)
+                                .bufferStore(offset, type);
+                        offset += copy;
+                    }
+                }
+
                 case STRUCT_FA -> {
                     assert carrier == MemorySegment.class;
                     bindings.allocate(layout);
@@ -420,24 +443,6 @@ public class CallArranger {
                         }
                     } else {
                         return getBindings(carrier, layout, STRUCT_A);
-                    }
-                }
-
-                case STRUCT_A -> {
-                    assert carrier == MemorySegment.class;
-                    bindings.allocate(layout);
-                    VMStorage[] locations = storageCalculator.getStorages(
-                            layout);
-                    int locIndex = 0;
-                    long offset = 0;
-                    while (offset < layout.byteSize()) {
-                        final long copy = Math.min(layout.byteSize() - offset, 8);
-                        VMStorage storage = locations[locIndex++];
-                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
-                        Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
-                        bindings.dup().vmLoad(storage, type)
-                                .bufferStore(offset, type);
-                        offset += copy;
                     }
                 }
 

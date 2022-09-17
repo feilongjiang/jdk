@@ -136,8 +136,6 @@ void DowncallStubGenerator::generate() {
       // spill area
       // out arg area (e.g. for stack args)
   };
-  Register tmp1 = t0;
-  Register tmp2 = t1;
 
   Register shufffle_reg = t2;
   JavaCallingConvention in_conv;
@@ -198,14 +196,14 @@ void DowncallStubGenerator::generate() {
 
   __ block_comment("{ thread java2native");
   address the_pc = __ pc();
-  __ set_last_Java_frame(sp, fp, the_pc, tmp1);
+  __ set_last_Java_frame(sp, fp, the_pc, t0);
   OopMap* map = new OopMap(_framesize, 0);
   _oop_maps->add_gc_map(the_pc - start, map);
 
   // State transition
-  __ mv(tmp1, _thread_in_native);
+  __ mv(t0, _thread_in_native);
   __ membar(MacroAssembler::LoadStore | MacroAssembler::StoreStore);
-  __ sw(tmp1, Address(xthread, JavaThread::thread_state_offset()));
+  __ sw(t0, Address(xthread, JavaThread::thread_state_offset()));
   __ block_comment("} thread java2native");
 
   __ block_comment("{ argument shuffle");
@@ -228,15 +226,15 @@ void DowncallStubGenerator::generate() {
     // when use return buffer, copy content of return registers to return buffer,
     // then operations created in BoxBindingCalculator will be operated.
     assert(ret_buf_addr_sp_offset != -1, "no return buffer addr spill");
-    __ ld(tmp1, Address(sp, ret_buf_addr_sp_offset));
+    __ ld(t0, Address(sp, ret_buf_addr_sp_offset));
     int offset = 0;
     for (int i = 0; i < _output_registers.length(); i++) {
       VMReg reg = _output_registers.at(i);
       if (reg->is_Register()) {
-        __ sd(reg->as_Register(), Address(tmp1, offset));
+        __ sd(reg->as_Register(), Address(t0, offset));
         offset += 8;
       } else if (reg->is_FloatRegister()) {
-        __ fsd(reg->as_FloatRegister(), Address(tmp1, offset));
+        __ fsd(reg->as_FloatRegister(), Address(t0, offset));
         offset += 8;
       } else {
         ShouldNotReachHere();
@@ -245,8 +243,8 @@ void DowncallStubGenerator::generate() {
   }
 
   __ block_comment("{ thread native2java");
-  __ mv(tmp1, _thread_in_native_trans);
-  __ sw(tmp1, Address(xthread, JavaThread::thread_state_offset()));
+  __ mv(t0, _thread_in_native_trans);
+  __ sw(t0, Address(xthread, JavaThread::thread_state_offset()));
 
   // Force this write out before the read below
   __ membar(MacroAssembler::AnyAny);
@@ -254,21 +252,21 @@ void DowncallStubGenerator::generate() {
   Label L_after_safepoint_poll;
   Label L_safepoint_poll_slow_path;
   __ safepoint_poll(L_safepoint_poll_slow_path, true /* at_return */, true /* acquire */, false /* in_nmethod */);
-  __ lwu(tmp1, Address(xthread, JavaThread::suspend_flags_offset()));
-  __ bnez(tmp1, L_safepoint_poll_slow_path);
+  __ lwu(t0, Address(xthread, JavaThread::suspend_flags_offset()));
+  __ bnez(t0, L_safepoint_poll_slow_path);
 
   __ bind(L_after_safepoint_poll);
 
-  __ mv(tmp1, _thread_in_Java);
+  __ mv(t0, _thread_in_Java);
   __ membar(MacroAssembler::LoadStore | MacroAssembler::StoreStore);
-  __ sw(tmp1, Address(xthread, JavaThread::thread_state_offset()));
+  __ sw(t0, Address(xthread, JavaThread::thread_state_offset()));
 
   __ block_comment("reguard stack check");
   Label L_reguard;
   Label L_after_reguard;
-  __ lbu(tmp1, Address(xthread, JavaThread::stack_guard_state_offset()));
-  __ mv(tmp2, StackOverflow::stack_guard_yellow_reserved_disabled);
-  __ beq(tmp1, tmp2, L_reguard);
+  __ lbu(t0, Address(xthread, JavaThread::stack_guard_state_offset()));
+  __ mv(t1, StackOverflow::stack_guard_yellow_reserved_disabled);
+  __ beq(t0, t1, L_reguard);
   __ bind(L_after_reguard);
 
   __ reset_last_Java_frame(true);

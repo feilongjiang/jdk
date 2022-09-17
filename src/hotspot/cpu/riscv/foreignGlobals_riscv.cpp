@@ -123,9 +123,9 @@ void RegSpiller::pd_load_reg(MacroAssembler* masm, int offset, VMReg reg) {
   }
 }
 
-#define __ _masm->
+#define __ masm->
 
-void ArgumentShuffle::pd_generate(MacroAssembler* _masm, VMReg tmp, int in_stk_bias, int out_stk_bias) const {
+void ArgumentShuffle::pd_generate(MacroAssembler* masm, VMReg tmp, int in_stk_bias, int out_stk_bias) const {
   assert(in_stk_bias == 0 && out_stk_bias == 0, "bias not implemented");
   Register tmp_reg = tmp->as_Register();
   for (int i = 0; i < _moves.length(); i++) {
@@ -134,7 +134,7 @@ void ArgumentShuffle::pd_generate(MacroAssembler* _masm, VMReg tmp, int in_stk_b
     VMRegPair from_vmreg = move.from;
     VMRegPair to_vmreg = move.to;
 
-    _masm->block_comment(err_msg("bt=%s", null_safe_string(type2name(arg_bt))));
+    masm->block_comment(err_msg("bt=%s", null_safe_string(type2name(arg_bt))));
     switch (arg_bt) {
       case T_BOOLEAN:
       case T_BYTE:

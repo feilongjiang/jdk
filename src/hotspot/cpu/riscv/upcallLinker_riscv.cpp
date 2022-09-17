@@ -32,7 +32,6 @@
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/signature.hpp"
 #include "runtime/stubRoutines.hpp"
-#include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 
 #define __ _masm->
@@ -40,7 +39,7 @@
 // for callee saved regs, according to the caller's ABI
 static int compute_reg_save_area_size(const ABIDescriptor& abi) {
   int size = 0;
-  for (int i = 0; i < RegisterImpl::number_of_registers; i++) {
+  for (int i = 0; i < Register::number_of_registers; i++) {
     Register reg = as_Register(i);
     if (reg == fp || reg == sp) continue; // saved/restored by prologue/epilogue
     if (!abi.is_volatile_reg(reg)) {
@@ -48,7 +47,7 @@ static int compute_reg_save_area_size(const ABIDescriptor& abi) {
     }
   }
 
-  for (int i = 0; i < FloatRegisterImpl::number_of_registers; i++) {
+  for (int i = 0; i < FloatRegister::number_of_registers; i++) {
     FloatRegister reg = as_FloatRegister(i);
     if (!abi.is_volatile_reg(reg)) {
       size += 8; // bytes
@@ -66,7 +65,7 @@ static void preserve_callee_saved_registers(MacroAssembler* _masm, const ABIDesc
   int offset = reg_save_area_offset;
 
   __ block_comment("{ preserve_callee_saved_regs ");
-  for (int i = 0; i < RegisterImpl::number_of_registers; i++) {
+  for (int i = 0; i < Register::number_of_registers; i++) {
     Register reg = as_Register(i);
     if (reg == fp || reg == sp) continue; // saved/restored by prologue/epilogue
     if (!abi.is_volatile_reg(reg)) {
@@ -75,7 +74,7 @@ static void preserve_callee_saved_registers(MacroAssembler* _masm, const ABIDesc
     }
   }
 
-  for (int i = 0; i < FloatRegisterImpl::number_of_registers; i++) {
+  for (int i = 0; i < FloatRegister::number_of_registers; i++) {
     FloatRegister reg = as_FloatRegister(i);
     if (!abi.is_volatile_reg(reg)) {
       __ fsd(reg, Address(sp, offset));
@@ -94,7 +93,7 @@ static void restore_callee_saved_registers(MacroAssembler* _masm, const ABIDescr
   int offset = reg_save_area_offset;
 
   __ block_comment("{ restore_callee_saved_regs ");
-  for (int i = 0; i < RegisterImpl::number_of_registers; i++) {
+  for (int i = 0; i < Register::number_of_registers; i++) {
     Register reg = as_Register(i);
     if (reg == fp || reg == sp) continue; // saved/restored by prologue/epilogue
     if (!abi.is_volatile_reg(reg)) {
@@ -103,7 +102,7 @@ static void restore_callee_saved_registers(MacroAssembler* _masm, const ABIDescr
     }
   }
 
-  for (int i = 0; i < FloatRegisterImpl::number_of_registers; i++) {
+  for (int i = 0; i < FloatRegister::number_of_registers; i++) {
     FloatRegister reg = as_FloatRegister(i);
     if (!abi.is_volatile_reg(reg)) {
       __ fld(reg, Address(sp, offset));
@@ -140,9 +139,6 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
   const ABIDescriptor abi = ForeignGlobals::parse_abi_descriptor(jabi);
   const CallRegs call_regs = ForeignGlobals::parse_call_regs(jconv);
   CodeBuffer buffer("upcall_stub", /* code_size = */ 2048, /* locs_size = */ 1024);
-
-  Register tmp1 = t0;
-  Register tmp2 = t1;
 
   Register shuffle_reg = t2;
   JavaCallingConvention out_conv;
@@ -245,7 +241,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
   // move the receiver to j_rarg0.
   __ block_comment("{ receiver ");
   __ movptr(shuffle_reg, (intptr_t) receiver);
-  __ resolve_jobject(shuffle_reg, xthread, tmp2);
+  __ resolve_jobject(shuffle_reg, t0, t1);
   __ mv(j_rarg0, shuffle_reg);
   __ block_comment("} receiver ");
 
@@ -254,8 +250,8 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
   __ sd(xmethod, Address(xthread, JavaThread::callee_target_offset())); // just in case callee is deoptimized
 
   // get entry address and do call.
-  __ ld(tmp1, Address(xmethod, Method::from_compiled_offset()));
-  __ jalr(tmp1);
+  __ ld(t0, Address(xmethod, Method::from_compiled_offset()));
+  __ jalr(t0);
 
   // return value shuffle
   if (!needs_return_buffer) {
@@ -287,7 +283,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
   } else {
     // move return value from return buffer to registers.
     assert(ret_buf_offset != -1, "no return buffer allocated");
-    __ la(tmp1, Address(sp, ret_buf_offset));
+    __ la(t0, Address(sp, ret_buf_offset));
 
     GrowableArray<StorageClass> storages = parse_reg_types(jconv);
     int offset = 0;
@@ -297,22 +293,22 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
       StorageClass regtype = storages.at(i);
       switch (regtype) {
         case StorageClass::FLOAT_32:
-          __ flw(reg->as_FloatRegister(), Address(tmp1, offset));
+          __ flw(reg->as_FloatRegister(), Address(t0, offset));
           break;
         case StorageClass::FLOAT_64:
-          __ fld(reg->as_FloatRegister(), Address(tmp1, offset));
+          __ fld(reg->as_FloatRegister(), Address(t0, offset));
           break;
         case StorageClass::INTEGER_8:
-          __ lb(reg->as_Register(), Address(tmp1, offset));
+          __ lb(reg->as_Register(), Address(t0, offset));
           break;
         case StorageClass::INTEGER_16:
-          __ lh(reg->as_Register(), Address(tmp1, offset));
+          __ lh(reg->as_Register(), Address(t0, offset));
           break;
         case StorageClass::INTEGER_32:
-          __ lw(reg->as_Register(), Address(tmp1, offset));
+          __ lw(reg->as_Register(), Address(t0, offset));
           break;
         case StorageClass::INTEGER_64:
-          __ ld(reg->as_Register(), Address(tmp1, offset));
+          __ ld(reg->as_Register(), Address(t0, offset));
           break;
         default:
           ShouldNotReachHere();
