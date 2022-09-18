@@ -155,7 +155,7 @@ void DowncallStubGenerator::generate() {
   int allocated_frame_size = 0;
   if (_needs_return_buffer) {
     // when perform downcall, only pointer to return buffer be saved in the stack.
-    // return buffer length will be determined by total size of vmstorages.
+    // return buffer size will be determined by total size of vmstorages.
     allocated_frame_size += 8; // store address
   }
   allocated_frame_size += arg_shuffle.out_arg_stack_slots() << LogBytesPerInt;
