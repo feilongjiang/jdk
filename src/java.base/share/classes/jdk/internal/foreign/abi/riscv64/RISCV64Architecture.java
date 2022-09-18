@@ -44,12 +44,12 @@ public class RISCV64Architecture implements Architecture {
     //
     // In the fact, a 16B return buffer will be allocated, 8B for a field, although size of struct{int, float} is 8B.
     //
-    // In this process of move return value from return buffer to registers, length information is necessary,
+    // In this process of move return value from return buffer to registers, width information is necessary,
     // fields can not be treated as raw, it means we can not load an int value by emitting 'ld' instruction,
     // that will fail to perform sign extension.
     //
-    // However, there is not any mechanism to pass length massage into makeUpcallStub.
-    // To achieve the aim, we can encode length information into RegType by defining
+    // However, there is not any mechanism to pass width massage into makeUpcallStub.
+    // To achieve the aim, we can encode width information into RegType by defining
     // more grained RegType, that is StorageClass, they can be considered as subtype of RegType.
     //
     // Enumeration values of below two interfaces must consistent with riscv64 backend.

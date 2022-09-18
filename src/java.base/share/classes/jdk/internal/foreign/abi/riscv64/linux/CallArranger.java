@@ -62,7 +62,7 @@ public class CallArranger {
 
     // Make registers as prototype, create new register with same index and name but different type.
     // In fact, registers with the same index are the same registers.
-    // The field type of VMStorage can encode length information.
+    // The field type of VMStorage can encode width information.
     static Map.Entry<Integer, VMStorage[]> buildStorageEntry(int storageClass, VMStorage[][] storagePrototypes) {
         VMStorage[] prototypes = storagePrototypes[regType(storageClass)];
         VMStorage[] result = new VMStorage[prototypes.length];
