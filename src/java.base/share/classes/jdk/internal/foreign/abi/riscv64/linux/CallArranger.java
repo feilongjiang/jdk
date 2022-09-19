@@ -215,7 +215,7 @@ public class CallArranger {
             int regCnt = (int) SharedUtils.alignUp(layout.byteSize(), 8) / 8;
             VMStorage[] storages = new VMStorage[regCnt];
             for (int i = 0; i < regCnt; i++) {
-                // Struct is allocated by getStorages will use integer calling convention.
+                // use integer calling convention.
                 storages[i] = getStorage(StorageClasses.INTEGER_64);
             }
             return storages;
@@ -249,8 +249,7 @@ public class CallArranger {
         abstract List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, boolean isVariadicArg);
 
         // Variadic arguments are passed according to the integer calling convention.
-        // When handling variadic part, floating-point calling convention
-        // should be converted into integer calling convention.
+        // When handling variadic part, integer calling convention should be used.
         static final Map<TypeClass, TypeClass> conventionConverterMap =
                 Map.ofEntries(Map.entry(FLOAT_32, INTEGER_32),
                               Map.entry(FLOAT_64, INTEGER_64),

@@ -31,8 +31,9 @@ import java.util.List;
 
 public enum TypeClass {
     /*
-     * STRUCT_REFERENCE: Struct its width > 16B, the reference to it shall be.
-     *     The reference shall be passed by integer register when a register is available.
+     * STRUCT_REFERENCE: Struct and its width > 16B, it will be replaced by reference to it.
+     *     The reference shall be passed by integer register when a register is available,
+     *     otherwise the reference will be passed by stack.
      *
      * STRUCT_FA: Struct contains one or two floating-point fields and its width <= 16B
      *     Should be passed by one or two float-pointing argument registers, if registers available,
@@ -42,11 +43,11 @@ public enum TypeClass {
      *     and its width <= 16B, shall be passed by both a floating-point argument register
      *     and an integer argument register where both a float register and an integer is available.
      *
-     * STRUCT_A: Struct its width <= 16B.
-     *     Should be passed by one or two integer argument register if register is available,
-     *     otherwise be passed stack.
+     * STRUCT_A: Struct and its width <= 16B.
+     *     Should be passed by one or two integer argument register if registers are available,
+     *     otherwise it will be passed by stack.
      *
-     * reference: https://github.com/riscv-non-isa/riscv-elf-psabi-doc
+     * See https://github.com/riscv-non-isa/riscv-elf-psabi-doc
      * */
     INTEGER_8,
     INTEGER_16,
