@@ -53,19 +53,20 @@ public class RISCV64Architecture implements Architecture {
     // more grained RegType, that is StorageClass, they can be considered as subtype of RegType.
     //
     // Enumeration values of below two interfaces must consistent with riscv64 backend.
-    public interface RegTypes {
-        int INTEGER = 0;
-        int FLOAT = 1;
-        int STACK = 2;
+    public interface RegTags {
+        int INTEGER_TAG = 0;
+        int FLOAT_TAG = 1 << 16;
+        int STACK_TAG = 2 << 16;
     }
 
     public interface StorageClasses {
-        int INTEGER_8 = 3;
-        int INTEGER_16 = 4;
-        int INTEGER_32 = 5;
-        int INTEGER_64 = 6;
-        int FLOAT_32 = 7;
-        int FLOAT_64 = 8;
+        int INTEGER_8 = RegTags.INTEGER_TAG  | 8;
+        int INTEGER_16 = RegTags.INTEGER_TAG  | 16;
+        int INTEGER_32 = RegTags.INTEGER_TAG  | 32;
+        int INTEGER_64 = RegTags.INTEGER_TAG  | 64;
+        int FLOAT_32 = RegTags.FLOAT_TAG  | 32;
+        int FLOAT_64 = RegTags.FLOAT_TAG  | 64;
+        int STACK_SLOT = RegTags.STACK_TAG;
 
         public static int fromTypeClass(TypeClass typeClass) {
             return switch (typeClass) {
@@ -156,39 +157,36 @@ public class RISCV64Architecture implements Architecture {
     public static final VMStorage f31 = floatRegister(31, "ft11");
 
     private static VMStorage integerRegister(int index, String debugName) {
-        return new VMStorage(RegTypes.INTEGER, index, debugName);
+        return new VMStorage(RegTags.INTEGER_TAG, index, debugName);
     }
 
     private static VMStorage floatRegister(int index, String debugName) {
-        return new VMStorage(RegTypes.FLOAT, index, debugName);
+        return new VMStorage(RegTags.FLOAT_TAG, index, debugName);
     }
 
     public static VMStorage stackStorage(int index) {
-        return new VMStorage(RegTypes.STACK, index, "Stack@" + index);
+        return new VMStorage(RegTags.STACK_TAG, index, "Stack@" + index);
     }
 
     @Override
     public boolean isStackType(int cls) {
-        return cls == RegTypes.STACK;
+        return cls == RegTags.STACK_TAG;
     }
 
     @Override
     public int typeSize(int cls) {
-        switch (cls) {
-            case RegTypes.INTEGER, StorageClasses.INTEGER_8, StorageClasses.INTEGER_16,
-                    StorageClasses.INTEGER_32, StorageClasses.INTEGER_64:
-                return INTEGER_REG_SIZE;
-            case RegTypes.FLOAT, StorageClasses.FLOAT_32, StorageClasses.FLOAT_64:
-                return FLOAT_REG_SIZE;
-            case RegTypes.STACK:
-                return STACK_SLOT_SIZE;
-        }
-        throw new IllegalArgumentException("Invalid Storage Class: " + cls);
+        return switch (cls) {
+            case StorageClasses.INTEGER_8, StorageClasses.INTEGER_16,
+                    StorageClasses.INTEGER_32, StorageClasses.INTEGER_64 -> INTEGER_REG_SIZE;
+            case StorageClasses.FLOAT_32, StorageClasses.FLOAT_64 -> FLOAT_REG_SIZE;
+            case StorageClasses.STACK_SLOT -> STACK_SLOT_SIZE;
+            default -> throw new IllegalArgumentException("Invalid type: " + cls);
+        };
     }
 
     @Override
     public int stackType() {
-        return RegTypes.STACK;
+        return RegTags.STACK_TAG;
     }
 
     public static ABIDescriptor abiFor(VMStorage[] inputIntRegs, VMStorage[] inputFloatRegs, VMStorage[] outputIntRegs,

@@ -64,7 +64,12 @@ public class CallArranger {
     // In fact, registers with the same index are the same registers.
     // The field type of VMStorage can encode width information.
     static Map.Entry<Integer, VMStorage[]> buildStorageEntry(int storageClass, VMStorage[][] storagePrototypes) {
-        VMStorage[] prototypes = storagePrototypes[regType(storageClass)];
+        int idx = switch (regTag(storageClass)){
+            case RegTags.INTEGER_TAG -> 0;
+            case RegTags.FLOAT_TAG -> 1;
+            default -> throw new IllegalStateException("Unexpected value: " + regTag(storageClass));
+        };
+        VMStorage[] prototypes = storagePrototypes[idx];
         VMStorage[] result = new VMStorage[prototypes.length];
         for (int i = 0; i < prototypes.length; i++) {
             result[i] = new VMStorage(storageClass, prototypes[i].index(), prototypes[i].name());
@@ -91,11 +96,11 @@ public class CallArranger {
             buildStorageEntry(StorageClasses.FLOAT_64, CLinux.outputStorage)
     );
 
-    static int regType(int storageClass) {
+    static int regTag(int storageClass) {
         return switch (storageClass) {
-            case StorageClasses.FLOAT_32, StorageClasses.FLOAT_64 -> RegTypes.FLOAT;
+            case StorageClasses.FLOAT_32, StorageClasses.FLOAT_64 -> RegTags.FLOAT_TAG;
             case StorageClasses.INTEGER_8, StorageClasses.INTEGER_16,
-                    StorageClasses.INTEGER_32, StorageClasses.INTEGER_64 -> RegTypes.INTEGER;
+                    StorageClasses.INTEGER_32, StorageClasses.INTEGER_64 -> RegTags.INTEGER_TAG;
             default -> -1;
         };
     }
@@ -170,11 +175,23 @@ public class CallArranger {
     static class StorageCalculator {
         private final boolean forArguments;
         // next available register index. 0=integerRegIdx, 1=floatRegIdx
+        private final int IntegerRegIdx = 0;
+        private final int FloatRegIdx = 1;
         private final int[] nRegs = {0, 0};
+
         private long stackOffset = 0;
 
         public StorageCalculator(boolean forArguments) {
             this.forArguments = forArguments;
+        }
+
+        int getNRegsIdx(int storageClass){
+            return switch (storageClass) {
+                case StorageClasses.FLOAT_32, StorageClasses.FLOAT_64 -> FloatRegIdx;
+                case StorageClasses.INTEGER_8, StorageClasses.INTEGER_16,
+                        StorageClasses.INTEGER_32, StorageClasses.INTEGER_64 -> IntegerRegIdx;
+                default -> -1;
+            };
         }
 
         VMStorage stackAlloc() {
@@ -184,15 +201,15 @@ public class CallArranger {
             return storage;
         }
 
-        Optional<VMStorage> regAlloc(int storageType) {
-            int allocateType = regType(storageType);
-            var availableRegs = MAX_REGISTER_ARGUMENTS - nRegs[allocateType];
+        Optional<VMStorage> regAlloc(int storageClass) {
+            int nRegsIdx = getNRegsIdx(storageClass);
+            var availableRegs = MAX_REGISTER_ARGUMENTS - nRegs[nRegsIdx];
             if (availableRegs > 0) {
                 VMStorage[] source =
-                        (forArguments ? inputStorage : outputStorage).get(storageType);
+                        (forArguments ? inputStorage : outputStorage).get(storageClass);
                 Optional<VMStorage> result =
-                        Optional.of(source[nRegs[allocateType]]);
-                nRegs[allocateType] += 1;
+                        Optional.of(source[nRegs[nRegsIdx]]);
+                nRegs[nRegsIdx] += 1;
                 return result;
             }
             return Optional.empty();
@@ -204,7 +221,7 @@ public class CallArranger {
             if (storage.isPresent()) return storage.get();
             // If storageClass is RegTypes.FLOAT, and no floating-point register is available,
             // try to allocate an integer register.
-            if (regType(storageClass) == RegTypes.FLOAT) {
+            if (regTag(storageClass) == RegTags.FLOAT_TAG) {
                 storage = regAlloc(StorageClasses.toIntegerClass(storageClass));
                 if (storage.isPresent()) return storage.get();
             }
@@ -222,13 +239,13 @@ public class CallArranger {
         }
 
         boolean availableRegs(int integerReg, int floatReg) {
-            return nRegs[RegTypes.INTEGER] + integerReg <= MAX_REGISTER_ARGUMENTS &&
-                   nRegs[RegTypes.FLOAT] + floatReg <= MAX_REGISTER_ARGUMENTS;
+            return nRegs[IntegerRegIdx] + integerReg <= MAX_REGISTER_ARGUMENTS &&
+                   nRegs[FloatRegIdx] + floatReg <= MAX_REGISTER_ARGUMENTS;
         }
 
         @Override
         public String toString() {
-            String nReg = "iReg: " + nRegs[0] + ", fReg: " + nRegs[1];
+            String nReg = "iReg: " + nRegs[IntegerRegIdx] + ", fReg: " + nRegs[FloatRegIdx];
             String stack = ", stackOffset: " + stackOffset;
             return "{" + nReg + stack + "}";
         }
@@ -298,7 +315,7 @@ public class CallArranger {
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
+                        boolean useFloat = regTag(storage.type()) == RegTags.FLOAT_TAG;
                         Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
                         if (offset + copy < layout.byteSize()) {
                             bindings.dup();
@@ -333,9 +350,9 @@ public class CallArranger {
                     if (storageCalculator.availableRegs(1, 1)) {
                         List<FlattenedFieldDesc> descs = getFlattenedFields((GroupLayout) layout);
                         for (int i = 0; i < 2; i++) {
-                            int storageType = StorageClasses.fromTypeClass(descs.get(i).typeClass());
+                            int storageClass = StorageClasses.fromTypeClass(descs.get(i).typeClass());
                             FlattenedFieldDesc desc = descs.get(i);
-                            VMStorage storage = storageCalculator.getStorage(storageType);
+                            VMStorage storage = storageCalculator.getStorage(storageClass);
                             Class<?> type = desc.layout().carrier();
                             if (i < 1) bindings.dup();
                             bindings.bufferLoad(desc.offset(), type)
@@ -400,7 +417,7 @@ public class CallArranger {
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
+                        boolean useFloat = regTag(storage.type()) == RegTags.FLOAT_TAG;
                         Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
                         bindings.dup().vmLoad(storage, type)
                                 .bufferStore(offset, type);
@@ -433,8 +450,8 @@ public class CallArranger {
                         List<FlattenedFieldDesc> descs = getFlattenedFields((GroupLayout) layout);
                         for (int i = 0; i < 2; i++) {
                             FlattenedFieldDesc desc = descs.get(i);
-                            int storageType = StorageClasses.fromTypeClass(desc.typeClass());
-                            VMStorage storage = storageCalculator.getStorage(storageType);
+                            int storageClass = StorageClasses.fromTypeClass(desc.typeClass());
+                            VMStorage storage = storageCalculator.getStorage(storageClass);
                             Class<?> type = desc.layout().carrier();
                             bindings.dup()
                                     .vmLoad(storage, type)
