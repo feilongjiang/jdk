@@ -49,20 +49,19 @@ struct ABIDescriptor {
   bool is_volatile_reg(FloatRegister reg) const;
 };
 
-enum class RegTag {
-  INTEGER_TAG = 0,
-  FLOAT_TAG = 1 << 16,
-  STACK_TAG = 2 << 16,
+enum class RegType {
+  INTEGER = 0,
+  FLOAT = 1 << 8,
+  STACK = 2 << 8,
 };
 
-#define TO_TAG(x) (x) & (((int)((short)-1)) << 16 )
 enum class StorageClass {
-  INTEGER_8 = static_cast<int>(RegTag::INTEGER_TAG) | 8,
-  INTEGER_16 = static_cast<int>(RegTag::INTEGER_TAG) | 16,
-  INTEGER_32 = static_cast<int>(RegTag::INTEGER_TAG) | 32,
-  INTEGER_64 = static_cast<int>(RegTag::INTEGER_TAG) | 64,
-  FLOAT_32 = static_cast<int>(RegTag::FLOAT_TAG) | 32,
-  FLOAT_64 = static_cast<int>(RegTag::FLOAT_TAG) | 64,
+  INTEGER_8 = static_cast<int>(RegType::INTEGER) | 8,
+  INTEGER_16 = static_cast<int>(RegType::INTEGER) | 16,
+  INTEGER_32 = static_cast<int>(RegType::INTEGER) | 32,
+  INTEGER_64 = static_cast<int>(RegType::INTEGER) | 64,
+  FLOAT_32 = static_cast<int>(RegType::FLOAT) | 32,
+  FLOAT_64 = static_cast<int>(RegType::FLOAT) | 64,
 };
 
 #endif // CPU_RISCV_FOREIGN_GLOBALS_RISCV_HPP
