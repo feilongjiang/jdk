@@ -44,7 +44,7 @@ import static jdk.internal.foreign.abi.riscv64.linux.TypeClass.*;
  *
  * This includes taking care of synthetic arguments like pointers to return buffers for 'in-memory' returns.
  */
-public class CallArranger {
+public class LinuxRISCV64CallArranger {
     private static final int STACK_SLOT_SIZE = 8;
     public static final int MAX_REGISTER_ARGUMENTS = 8;
     private static final ABIDescriptor CLinux = abiFor(
@@ -115,7 +115,7 @@ public class CallArranger {
         }
     }
 
-    public static CallArranger.Bindings getBindings(MethodType mt, FunctionDescriptor cDesc, boolean forUpcall) {
+    public static LinuxRISCV64CallArranger.Bindings getBindings(MethodType mt, FunctionDescriptor cDesc, boolean forUpcall) {
         CallingSequenceBuilder csb = new CallingSequenceBuilder(CLinux, forUpcall);
         BindingCalculator argCalc = forUpcall ? new BoxBindingCalculator(true) : new UnboxBindingCalculator(true);
         BindingCalculator retCalc = forUpcall ? new UnboxBindingCalculator(false) : new BoxBindingCalculator(false);
@@ -139,11 +139,11 @@ public class CallArranger {
             csb.addArgumentBindings(carrier, layout, argCalc.getBindings(carrier, layout, isVar));
         }
 
-        return new CallArranger.Bindings(csb.build(), returnInMemory);
+        return new LinuxRISCV64CallArranger.Bindings(csb.build(), returnInMemory);
     }
 
     public static MethodHandle arrangeDowncall(MethodType mt, FunctionDescriptor cDesc) {
-        CallArranger.Bindings bindings = getBindings(mt, cDesc, false);
+        LinuxRISCV64CallArranger.Bindings bindings = getBindings(mt, cDesc, false);
 
         MethodHandle handle = new DowncallLinker(CLinux, bindings.callingSequence).getBoundMethodHandle();
 
@@ -156,7 +156,7 @@ public class CallArranger {
 
     public static MemorySegment arrangeUpcall(MethodHandle target, MethodType mt, FunctionDescriptor cDesc, MemorySession session) {
 
-        CallArranger.Bindings bindings = getBindings(mt, cDesc, true);
+        LinuxRISCV64CallArranger.Bindings bindings = getBindings(mt, cDesc, true);
 
         if (bindings.isInMemoryReturn) {
             target = SharedUtils.adaptUpcallForIMR(target, true /* drop return, since we don't have bindings for it */);
@@ -185,15 +185,6 @@ public class CallArranger {
             this.forArguments = forArguments;
         }
 
-        int getNRegsIdx(int storageClass){
-            return switch (storageClass) {
-                case StorageClasses.FLOAT_32, StorageClasses.FLOAT_64 -> FloatRegIdx;
-                case StorageClasses.INTEGER_8, StorageClasses.INTEGER_16,
-                        StorageClasses.INTEGER_32, StorageClasses.INTEGER_64 -> IntegerRegIdx;
-                default -> -1;
-            };
-        }
-
         VMStorage stackAlloc() {
             assert forArguments : "no stack returns";
             VMStorage storage = stackStorage((int) (stackOffset / STACK_SLOT_SIZE));
@@ -202,7 +193,7 @@ public class CallArranger {
         }
 
         Optional<VMStorage> regAlloc(int storageClass) {
-            int nRegsIdx = getNRegsIdx(storageClass);
+            int nRegsIdx = storageClass >> 8;
             var availableRegs = MAX_REGISTER_ARGUMENTS - nRegs[nRegsIdx];
             if (availableRegs > 0) {
                 VMStorage[] source =
@@ -260,7 +251,7 @@ public class CallArranger {
         }
 
         protected BindingCalculator(boolean forArguments) {
-            this.storageCalculator = new CallArranger.StorageCalculator(forArguments);
+            this.storageCalculator = new LinuxRISCV64CallArranger.StorageCalculator(forArguments);
         }
 
         abstract List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, boolean isVariadicArg);

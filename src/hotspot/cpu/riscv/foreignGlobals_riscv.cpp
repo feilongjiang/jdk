@@ -63,9 +63,8 @@ const ABIDescriptor ForeignGlobals::parse_abi_descriptor(jobject jabi) {
 }
 
 VMReg ForeignGlobals::vmstorage_to_vmreg(int type, int index) {
-  //((int)((short)-1)) << 16
-  int regtype = type & (((int) ((char) -1)) << 8); // todo -- use utils.
-  switch (static_cast<RegType>((type) & (((int)((char)-1)) << 16 ))) {
+  int regtype = (type >> 8) << 8;
+  switch (static_cast<RegType>(regtype)) {
     case RegType::INTEGER:
       return ::as_Register(index)->as_VMReg();
     case RegType::FLOAT:

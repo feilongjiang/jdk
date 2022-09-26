@@ -52,7 +52,7 @@ struct ABIDescriptor {
 enum class RegType {
   INTEGER = 0,
   FLOAT = 1 << 8,
-  STACK = 2 << 8,
+  STACK = 2 << 8
 };
 
 enum class StorageClass {
@@ -61,7 +61,7 @@ enum class StorageClass {
   INTEGER_32 = static_cast<int>(RegType::INTEGER) | 32,
   INTEGER_64 = static_cast<int>(RegType::INTEGER) | 64,
   FLOAT_32 = static_cast<int>(RegType::FLOAT) | 32,
-  FLOAT_64 = static_cast<int>(RegType::FLOAT) | 64,
+  FLOAT_64 = static_cast<int>(RegType::FLOAT) | 64
 };
 
 #endif // CPU_RISCV_FOREIGN_GLOBALS_RISCV_HPP
