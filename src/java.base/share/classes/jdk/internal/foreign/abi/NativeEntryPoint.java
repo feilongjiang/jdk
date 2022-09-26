@@ -25,10 +25,8 @@
 
 package jdk.internal.foreign.abi;
 
-import jdk.internal.foreign.CABI;
 import jdk.internal.ref.CleanerFactory;
 
-import java.lang.foreign.FunctionDescriptor;
 import java.lang.invoke.MethodType;
 import java.lang.ref.Cleaner;
 import java.util.Arrays;

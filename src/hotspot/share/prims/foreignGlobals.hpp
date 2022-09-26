@@ -40,12 +40,9 @@ public:
 struct CallRegs {
   GrowableArray<VMReg> _arg_regs;
   GrowableArray<VMReg> _ret_regs;
-  bool _length_sensitive;
-  GrowableArray<long> _offset;
-  GrowableArray<long> _length;
+
   CallRegs(int num_args, int num_rets)
-    : _arg_regs(num_args), _ret_regs(num_rets),
-    _offset(num_rets), _length(num_rets) {}
+    : _arg_regs(num_args), _ret_regs(num_rets) {}
 };
 
 class ForeignGlobals {
@@ -59,6 +56,7 @@ public:
   static VMReg vmstorage_to_vmreg(int type, int index);
   static VMReg parse_vmstorage(oop storage);
 };
+
 
 
 class JavaCallingConvention : public CallingConventionClosure {

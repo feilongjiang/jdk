@@ -25,7 +25,6 @@
 
 package jdk.internal.foreign.abi;
 
-import jdk.internal.foreign.CABI;
 import sun.security.action.GetPropertyAction;
 
 import java.lang.foreign.MemorySegment;
@@ -62,8 +61,7 @@ public class UpcallLinker {
         }
     }
 
-    public static MemorySegment make(ABIDescriptor abi, MethodHandle target, CallingSequence callingSequence, MemorySession session,
-                                     boolean lengthSensitive, long[] offset, long[] length) {
+    public static MemorySegment make(ABIDescriptor abi, MethodHandle target, CallingSequence callingSequence, MemorySession session) {
         assert callingSequence.forUpcall();
         Binding.VMLoad[] argMoves = argMoveBindings(callingSequence);
         Binding.VMStore[] retMoves = retMoveBindings(callingSequence);
@@ -92,13 +90,7 @@ public class UpcallLinker {
         doBindings = insertArguments(exactInvoker(doBindings.type()), 0, doBindings);
         VMStorage[] args = Arrays.stream(argMoves).map(Binding.Move::storage).toArray(VMStorage[]::new);
         VMStorage[] rets = Arrays.stream(retMoves).map(Binding.Move::storage).toArray(VMStorage[]::new);
-
-        CallRegs conv;
-        if (CABI.current() == CABI.LinuxRISCV64){
-            conv = new CallRegs(args, rets, lengthSensitive, offset, length);
-        } else{
-            conv = new CallRegs(args, rets, false, null, null);
-        }
+        CallRegs conv = new CallRegs(args, rets);
         long entryPoint = makeUpcallStub(doBindings, abi, conv,
                 callingSequence.needsReturnBuffer(), callingSequence.returnBufferSize());
         return UpcallStubs.makeUpcall(entryPoint, session);
@@ -204,8 +196,7 @@ public class UpcallLinker {
     }
 
     // used for transporting data into native code
-    private static record CallRegs(VMStorage[] argRegs, VMStorage[] retRegs, boolean lengthSensitive,
-                                   long[] offset, long[] length) {}
+    private static record CallRegs(VMStorage[] argRegs, VMStorage[] retRegs) {}
 
     static native long makeUpcallStub(MethodHandle mh, ABIDescriptor abi, CallRegs conv,
                                       boolean needsReturnBuffer, long returnBufferSize);
