@@ -79,48 +79,26 @@
  *   TestUpcallHighArity
  */
 
-/* @test id=DowncallStack-T
+/* @test id=Downcall-F
  * @enablePreview
  * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
- * @build NativeTestHelper CallGeneratorHelper TestDowncallStack
- *
- * @run testng/othervm/native/manual
- *   --enable-native-access=ALL-UNNAMED
- *   -Djdk.internal.foreign.ProgrammableInvoker.USE_SPEC=true
- *   TestDowncallStack
- */
-
-/* @test id=DowncallStack-F
- * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
- * @build NativeTestHelper CallGeneratorHelper TestDowncallStack
+ * @build NativeTestHelper CallGeneratorHelper TestDowncall
  *
  * @run testng/othervm/native/manual
  *   --enable-native-access=ALL-UNNAMED
  *   -Djdk.internal.foreign.ProgrammableInvoker.USE_SPEC=false
- *   TestDowncallStack
+ *   TestDowncall
  */
 
-/* @test id=DowncallScope-T
+/* @test id=Downcall-T
  * @enablePreview
  * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
- * @build NativeTestHelper CallGeneratorHelper TestDowncallScope
+ * @build NativeTestHelper CallGeneratorHelper TestDowncall
  *
  * @run testng/othervm/native/manual
  *   --enable-native-access=ALL-UNNAMED
  *   -Djdk.internal.foreign.ProgrammableInvoker.USE_SPEC=true
- *   TestDowncallScope
- */
-
-/* @test id=DowncallScope-F
- * @enablePreview
- * @requires ((os.arch == "amd64" | os.arch == "x86_64") & sun.arch.data.model == "64") | os.arch == "aarch64" | os.arch == "riscv64"
- * @build NativeTestHelper CallGeneratorHelper TestDowncallScope
- *
- * @run testng/othervm/native/manual
- *   --enable-native-access=ALL-UNNAMED
- *   -Djdk.internal.foreign.ProgrammableInvoker.USE_SPEC=false
- *   TestDowncallScope
+ *   TestDowncall
  */
 
 /* @test id=UpcallScope-FF

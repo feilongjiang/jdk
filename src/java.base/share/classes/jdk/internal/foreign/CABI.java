@@ -65,8 +65,6 @@ public enum CABI {
             } else {
                 // unsupported
                 ABI = null;
-                throw new UnsupportedOperationException(
-                        "Unsupported os, arch, or address size: " + OS + ", " + ARCH + ", " + ADDRESS_SIZE);
             }
         } else {
             // unsupported

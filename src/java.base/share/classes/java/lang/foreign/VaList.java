@@ -32,6 +32,7 @@ import java.util.function.Consumer;
 import jdk.internal.foreign.abi.SharedUtils;
 import jdk.internal.foreign.abi.aarch64.linux.LinuxAArch64VaList;
 import jdk.internal.foreign.abi.aarch64.macos.MacOsAArch64VaList;
+import jdk.internal.foreign.abi.riscv64.linux.LinuxRISCV64VaList;
 import jdk.internal.foreign.abi.x64.sysv.SysVVaList;
 import jdk.internal.foreign.abi.x64.windows.WinVaList;
 import jdk.internal.foreign.abi.riscv64.linux.LinuxRISCV64VaList;

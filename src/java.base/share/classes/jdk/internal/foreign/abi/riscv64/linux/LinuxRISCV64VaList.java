@@ -22,6 +22,7 @@
  * questions.
  *
  */
+
 package jdk.internal.foreign.abi.riscv64.linux;
 
 import jdk.internal.foreign.MemorySessionImpl;
@@ -29,17 +30,20 @@ import jdk.internal.foreign.Scoped;
 import jdk.internal.foreign.Utils;
 import jdk.internal.foreign.abi.SharedUtils;
 
-
 import java.lang.foreign.*;
-
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 import static java.lang.foreign.ValueLayout.ADDRESS;
-import static jdk.internal.foreign.abi.SharedUtils.*;
+import static jdk.internal.foreign.abi.SharedUtils.SimpleVaArg;
+import static jdk.internal.foreign.abi.SharedUtils.THROWING_ALLOCATOR;
 
+// In some arch, like x86 or aarch64, va_list is implemented as a struct.
+// In riscv64, its implementation is much simple, just a void*.
+//
+// See https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-cc.adoc#cc-type-representations
 public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
     private final MemorySegment segment;
     private long offset;
@@ -98,20 +102,20 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
         checkStackElement(layout);
         preAlignStack();
         return switch (typeClass) {
-            case STRUCT_REGISTER, STRUCT_SFA, STRUCT_IAF -> {
+            case INTEGER_8, INTEGER_16, INTEGER_32, INTEGER_64, FLOAT_32, FLOAT_64, POINTER -> {
+                VarHandle reader = layout.varHandle();
+                MemorySegment slice = segment.asSlice(offset, layout.byteSize());
+                Object res = reader.get(slice);
+                postAlignStack(layout);
+                yield res;
+            }
+            case STRUCT_A, STRUCT_FA, STRUCT_BOTH -> {
                 // Struct is passed indirectly via a pointer in an integer register.
                 MemorySegment slice = segment.asSlice(offset, layout.byteSize());
                 MemorySegment seg = allocator.allocate(layout);
                 seg.copyFrom(slice);
                 postAlignStack(layout);
                 yield seg;
-            }
-            case INTEGER, FLOAT, POINTER -> {
-                VarHandle reader = layout.varHandle();
-                MemorySegment slice = segment.asSlice(offset, layout.byteSize());
-                Object res = reader.get(slice);
-                postAlignStack(layout);
-                yield res;
             }
             case STRUCT_REFERENCE -> {
                 VarHandle addrReader = ADDRESS.varHandle();
@@ -122,7 +126,6 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
                 seg.copyFrom(MemorySegment.ofAddress(addr, layout.byteSize(), session()));
                 yield seg;
             }
-            default -> throw new IllegalArgumentException("Can not handle MemoryLayout: " + layout);
         };
     }
 
@@ -148,10 +151,9 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
             Objects.requireNonNull(layout);
             TypeClass typeClass = TypeClass.classifyLayout(layout);
             switch (typeClass) {
-                case INTEGER, FLOAT, POINTER, STRUCT_REFERENCE -> offset += 8;
-                case STRUCT_REGISTER, STRUCT_IAF, STRUCT_SFA ->
-                        offset += Utils.alignUp(layout.byteSize(), STACK_SLOT_SIZE);
-                case SEQUENCE -> throw new IllegalArgumentException("Can not handle MemoryLayout: " + layout);
+                case INTEGER_8, INTEGER_16, INTEGER_32, INTEGER_64, FLOAT_32, FLOAT_64, POINTER, STRUCT_REFERENCE ->
+                        offset += 8;
+                case STRUCT_A, STRUCT_FA, STRUCT_BOTH -> offset += Utils.alignUp(layout.byteSize(), STACK_SLOT_SIZE);
             }
         }
     }
@@ -176,8 +178,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
     public static non-sealed class Builder implements VaList.Builder {
 
         private final MemorySession session;
-        private final List<SimpleVaArg> stackSlot = new ArrayList<>();
-
+        private final List<SimpleVaArg> stackArgs = new ArrayList<>();
 
         Builder(MemorySession session) {
             this.session = session;
@@ -211,31 +212,31 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
         private Builder arg(MemoryLayout layout, Object value) {
             Objects.requireNonNull(layout);
             Objects.requireNonNull(value);
-            stackSlot.add(new SimpleVaArg(layout, value));
+            stackArgs.add(new SimpleVaArg(layout, value));
             return this;
         }
 
         boolean isEmpty() {
-            return stackSlot.isEmpty();
+            return stackArgs.isEmpty();
         }
 
         public VaList build() {
             if (isEmpty()) return EMPTY;
             SegmentAllocator allocator = SegmentAllocator.newNativeArena(session);
-            long stackArgsSize = stackSlot.stream()
-                    .reduce(0L, (acc, e) -> {
-                        long elementSize = TypeClass.classifyLayout(e.layout) == TypeClass.STRUCT_REFERENCE ?
-                                ADDRESS.byteSize() : e.layout.byteSize();
-                        return acc + Utils.alignUp(elementSize, STACK_SLOT_SIZE);
-                    }, Long::sum);
+            long stackArgsSize = stackArgs.stream()
+                                          .reduce(0L, (acc, e) -> {
+                                              long elementSize = TypeClass.classifyLayout(e.layout) == TypeClass.STRUCT_REFERENCE ?
+                                                      ADDRESS.byteSize() : e.layout.byteSize();
+                                              return acc + Utils.alignUp(elementSize, STACK_SLOT_SIZE);
+                                          }, Long::sum);
             MemorySegment argsSegment = allocator.allocate(stackArgsSize, 16);
             MemorySegment writeCursor = argsSegment;
-            for (SimpleVaArg arg : stackSlot) {
+            for (SimpleVaArg arg : stackArgs) {
                 MemoryLayout layout;
                 Object value;
                 if (TypeClass.classifyLayout(arg.layout) == TypeClass.STRUCT_REFERENCE) {
                     layout = ADDRESS;
-                    value = ((MemorySegment)arg.value).address();
+                    value = ((MemorySegment) arg.value).address();
                 } else {
                     layout = arg.layout;
                     value = arg.value;
@@ -257,5 +258,3 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
     }
 
 }
-
-
