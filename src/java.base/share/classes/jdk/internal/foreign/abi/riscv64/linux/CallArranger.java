@@ -64,10 +64,10 @@ public class CallArranger {
     // In fact, registers with the same index are the same registers.
     // The field type of VMStorage can encode width information.
     static Map.Entry<Integer, VMStorage[]> buildStorageEntry(int storageClass, VMStorage[][] storagePrototypes) {
-        int idx = switch (regTag(storageClass)){
+        int idx = switch (regType(storageClass)){
             case RegTypes.INTEGER -> 0;
             case RegTypes.FLOAT -> 1;
-            default -> throw new IllegalStateException("Unexpected value: " + regTag(storageClass));
+            default -> throw new IllegalStateException("Unexpected value: " + regType(storageClass));
         };
         VMStorage[] prototypes = storagePrototypes[idx];
         VMStorage[] result = new VMStorage[prototypes.length];
@@ -96,7 +96,7 @@ public class CallArranger {
             buildStorageEntry(StorageClasses.FLOAT_64, CLinux.outputStorage)
     );
 
-    static int regTag(int storageClass) {
+    static int regType(int storageClass) {
         return switch (storageClass) {
             case StorageClasses.FLOAT_32, StorageClasses.FLOAT_64 -> RegTypes.FLOAT;
             case StorageClasses.INTEGER_8, StorageClasses.INTEGER_16,
@@ -221,7 +221,7 @@ public class CallArranger {
             if (storage.isPresent()) return storage.get();
             // If storageClass is RegTypes.FLOAT, and no floating-point register is available,
             // try to allocate an integer register.
-            if (regTag(storageClass) == RegTypes.FLOAT) {
+            if (regType(storageClass) == RegTypes.FLOAT) {
                 storage = regAlloc(StorageClasses.toIntegerClass(storageClass));
                 if (storage.isPresent()) return storage.get();
             }
@@ -315,7 +315,7 @@ public class CallArranger {
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = regTag(storage.type()) == RegTypes.FLOAT;
+                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
                         Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
                         if (offset + copy < layout.byteSize()) {
                             bindings.dup();
@@ -417,7 +417,7 @@ public class CallArranger {
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = regTag(storage.type()) == RegTypes.FLOAT;
+                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
                         Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
                         bindings.dup().vmLoad(storage, type)
                                 .bufferStore(offset, type);
