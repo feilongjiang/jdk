@@ -30,6 +30,7 @@
 #include "oops/oopsHierarchy.hpp"
 #include "oops/objArrayOop.hpp"
 #include "oops/oopCast.inline.hpp"
+#include "oops/typeArrayOop.inline.hpp"
 
 template<typename T, typename Func>
 void ForeignGlobals::parse_register_array(objArrayOop jarray, int type_index, GrowableArray<T>& array, Func converter) {
