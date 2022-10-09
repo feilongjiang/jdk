@@ -211,7 +211,6 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
                     bufferLoad(4, float.class), vmStore(Float32(f10), float.class)
                 }
             },
-
             // struct s { float a; /* padding */ double b };
             { MemoryLayout.structLayout(C_FLOAT, MemoryLayout.paddingLayout(32), C_DOUBLE),
                 new Binding[]{
@@ -222,15 +221,15 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
                     bufferLoad(8, double.class), vmStore(Float64(f11), double.class),
                 }
             },
-
             // struct __attribute__((__packed__)) s { float a; double b; };
-            { MemoryLayout.structLayout(C_FLOAT, C_DOUBLE), new Binding[]{
-                dup(),
-                // s.a
-                bufferLoad(0, float.class), vmStore(Float32(f10), float.class),
-                // s.b
-                bufferLoad(4, double.class), vmStore(Float64(f11), double.class),
-            }
+            { MemoryLayout.structLayout(C_FLOAT, C_DOUBLE),
+                new Binding[]{
+                    dup(),
+                    // s.a
+                    bufferLoad(0, float.class), vmStore(Float32(f10), float.class),
+                    // s.b
+                    bufferLoad(4, double.class), vmStore(Float64(f11), double.class),
+                }
             },
             // struct s { float a; float b __attribute__ ((aligned (8))); }
             { MemoryLayout.structLayout(C_FLOAT, MemoryLayout.paddingLayout(32),
