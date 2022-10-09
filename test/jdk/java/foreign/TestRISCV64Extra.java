@@ -28,6 +28,9 @@
  * @test
  * @enablePreview
  * @requires os.arch == "riscv64"
+ * @modules java.base/jdk.internal.foreign
+ *          java.base/jdk.internal.foreign.abi
+ *          java.base/jdk.internal.foreign.abi.aarch64
  *
  * @run testng/othervm --enable-native-access=ALL-UNNAMED TestRISCV64Extra
  */
@@ -36,12 +39,12 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.lang.foreign.*;
+import java.lang.invoke.MethodHandle;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
-
 import static org.testng.Assert.assertEquals;
-
+import static jdk.internal.foreign.PlatformLayouts.LinuxRISCV64.*;
 
 public class TestRISCV64Extra {
     static {
@@ -54,12 +57,39 @@ public class TestRISCV64Extra {
     static final double DOUBLE_VALUE = 721.5;
     static Linker LINKER = Linker.nativeLinker();
 
+    @Test
+    void spill() throws Throwable {
+        GroupLayout struct = MemoryLayout.structLayout(C_FLOAT, C_FLOAT);
+        String fName = "f_spill";
+        FunctionDescriptor fd = FunctionDescriptor.of(struct, C_FLOAT, C_FLOAT, C_FLOAT, C_FLOAT,
+                                                      C_FLOAT, C_FLOAT, C_FLOAT, struct);
+        MemorySegment target = SymbolLookup.loaderLookup().lookup(fName).get();
+        MethodHandle mh = LINKER.downcallHandle(target, fd);
+        BiFunction<MemorySession, MemoryLayout, MemorySegment> initializer = (session, layout) -> {
+            MemorySegment segment = session.allocate(layout);
+            segment.set(C_FLOAT, 0, FLOAT_VALUE);
+            segment.set(C_FLOAT, 4, FLOAT_VALUE);
+            return segment;
+        };
+        Consumer<MemorySegment> checker = segment -> {
+            assertEquals(segment.get(C_FLOAT, 0), FLOAT_VALUE);
+            assertEquals(segment.get(C_FLOAT, 4), FLOAT_VALUE);
+        };
+        try (MemorySession session = MemorySession.openConfined()) {
+            MemorySegment segment = initializer.apply(session, struct);
+            MemorySegment returnValue = (MemorySegment) mh.invoke(session, FLOAT_VALUE, FLOAT_VALUE, FLOAT_VALUE,
+                                                                  FLOAT_VALUE, FLOAT_VALUE, FLOAT_VALUE, FLOAT_VALUE,
+                                                                  segment);
+            checker.accept(returnValue);
+        }
+    }
+
     @Test(dataProvider = "structs")
     void test(MemoryLayout struct, String fName, BiFunction<MemorySession, MemoryLayout, MemorySegment> initializer,
               Consumer<MemorySegment> checker) throws Throwable {
-        var fd = FunctionDescriptor.of(struct, struct);
-        var target = SymbolLookup.loaderLookup().lookup(fName).get();
-        var mh = LINKER.downcallHandle(target, fd);
+        FunctionDescriptor fd = FunctionDescriptor.of(struct, struct);
+        MemorySegment target = SymbolLookup.loaderLookup().lookup(fName).get();
+        MethodHandle mh = LINKER.downcallHandle(target, fd);
 
         try (MemorySession session = MemorySession.openConfined()) {
             MemorySegment segment = initializer.apply(session, struct);
@@ -73,68 +103,96 @@ public class TestRISCV64Extra {
         return new Object[][]{
             /* struct{float[2]} */
             {
-                MemoryLayout.structLayout(MemoryLayout.sequenceLayout(2, NativeTestHelper.C_FLOAT)),
+                MemoryLayout.structLayout(MemoryLayout.sequenceLayout(2, C_FLOAT)),
                 "f_s_af2",
                 (BiFunction<MemorySession, MemoryLayout, MemorySegment>) (session, layout) -> {
                     MemorySegment segment = session.allocate(layout);
-                    segment.set(NativeTestHelper.C_FLOAT, 0, FLOAT_VALUE);
-                    segment.set(NativeTestHelper.C_FLOAT, 4, FLOAT_VALUE);
+                    segment.set(C_FLOAT, 0, FLOAT_VALUE);
+                    segment.set(C_FLOAT, 4, FLOAT_VALUE);
                     return segment;
                 },
                 (Consumer<MemorySegment>) segment -> {
-                    assertEquals(segment.get(NativeTestHelper.C_FLOAT, 0), FLOAT_VALUE);
-                    assertEquals(segment.get(NativeTestHelper.C_FLOAT, 4), FLOAT_VALUE);
+                    assertEquals(segment.get(C_FLOAT, 0), FLOAT_VALUE);
+                    assertEquals(segment.get(C_FLOAT, 4), FLOAT_VALUE);
                 }
             },
             /* struct{double[2]} */
             {
-                MemoryLayout.structLayout(MemoryLayout.sequenceLayout(2, NativeTestHelper.C_DOUBLE)),
+                MemoryLayout.structLayout(MemoryLayout.sequenceLayout(2, C_DOUBLE)),
                 "f_s_ad2",
                 (BiFunction<MemorySession, MemoryLayout, MemorySegment>) (session, layout) -> {
                     MemorySegment segment = session.allocate(layout);
-                    segment.set(NativeTestHelper.C_DOUBLE, 0, DOUBLE_VALUE);
-                    segment.set(NativeTestHelper.C_DOUBLE, 8, DOUBLE_VALUE);
+                    segment.set(C_DOUBLE, 0, DOUBLE_VALUE);
+                    segment.set(C_DOUBLE, 8, DOUBLE_VALUE);
                     return segment;
                 },
                 (Consumer<MemorySegment>) segment -> {
-                    assertEquals(segment.get(NativeTestHelper.C_DOUBLE, 0), DOUBLE_VALUE);
-                    assertEquals(segment.get(NativeTestHelper.C_DOUBLE, 8), DOUBLE_VALUE);
+                    assertEquals(segment.get(C_DOUBLE, 0), DOUBLE_VALUE);
+                    assertEquals(segment.get(C_DOUBLE, 8), DOUBLE_VALUE);
                 }
             },
             /* struct{int[1], padding 4B ,double[1]} */
             {
-                MemoryLayout.structLayout(MemoryLayout.sequenceLayout(1, NativeTestHelper.C_INT),
+                MemoryLayout.structLayout(MemoryLayout.sequenceLayout(1, C_INT),
                                           MemoryLayout.paddingLayout(32),
-                                          MemoryLayout.sequenceLayout(1, NativeTestHelper.C_DOUBLE)),
+                                          MemoryLayout.sequenceLayout(1, C_DOUBLE)),
                 "f_s_ai1ad1",
                 (BiFunction<MemorySession, MemoryLayout, MemorySegment>) (session, layout) -> {
                     MemorySegment segment = session.allocate(layout);
-                    segment.set(NativeTestHelper.C_INT, 0, INT_VALUE);
-                    segment.set(NativeTestHelper.C_DOUBLE, 8, DOUBLE_VALUE);
+                    segment.set(C_INT, 0, INT_VALUE);
+                    segment.set(C_DOUBLE, 8, DOUBLE_VALUE);
                     return segment;
                 },
                 (Consumer<MemorySegment>) segment -> {
-                    assertEquals(segment.get(NativeTestHelper.C_INT, 0), INT_VALUE);
-                    assertEquals(segment.get(NativeTestHelper.C_DOUBLE, 8), DOUBLE_VALUE);
+                    assertEquals(segment.get(C_INT, 0), INT_VALUE);
+                    assertEquals(segment.get(C_DOUBLE, 8), DOUBLE_VALUE);
                 }
             },
             /* struct{struct{int, float}} */
             {
-                MemoryLayout.structLayout(MemoryLayout.structLayout(NativeTestHelper.C_LONG_LONG,
-                                                                    NativeTestHelper.C_FLOAT)),
+                MemoryLayout.structLayout(MemoryLayout.structLayout(C_LONG_LONG,
+                                                                    C_FLOAT)),
                 "f_s_s_lf",
                 (BiFunction<MemorySession, MemoryLayout, MemorySegment>) (session, layout) -> {
                     MemorySegment segment = session.allocate(layout);
-                    segment.set(NativeTestHelper.C_LONG_LONG, 0, LONG_VALUE);
-                    segment.set(NativeTestHelper.C_FLOAT, 8, FLOAT_VALUE);
+                    segment.set(C_LONG_LONG, 0, LONG_VALUE);
+                    segment.set(C_FLOAT, 8, FLOAT_VALUE);
                     return segment;
                 },
                 (Consumer<MemorySegment>) segment -> {
-                    assertEquals(segment.get(NativeTestHelper.C_LONG_LONG, 0), LONG_VALUE);
-                    assertEquals(segment.get(NativeTestHelper.C_FLOAT, 8), FLOAT_VALUE);
+                    assertEquals(segment.get(C_LONG_LONG, 0), LONG_VALUE);
+                    assertEquals(segment.get(C_FLOAT, 8), FLOAT_VALUE);
+                }
+            },
+            {
+                MemoryLayout.structLayout(C_FLOAT, MemoryLayout.paddingLayout(32),
+                                          C_FLOAT, MemoryLayout.paddingLayout(32)),
+                "f_s_ff",
+                (BiFunction<MemorySession, MemoryLayout, MemorySegment>) (session, layout) -> {
+                    MemorySegment segment = session.allocate(layout);
+                    segment.set(C_FLOAT, 0, FLOAT_VALUE);
+                    segment.set(C_FLOAT, 8, FLOAT_VALUE);
+                    return segment;
+                },
+                (Consumer<MemorySegment>) segment -> {
+                    assertEquals(segment.get(C_FLOAT, 0), FLOAT_VALUE);
+                    assertEquals(segment.get(C_FLOAT, 8), FLOAT_VALUE);
+                }
+            },
+            {
+                MemoryLayout.structLayout(C_FLOAT, C_DOUBLE.withBitAlignment(32)),
+                "f_s_fd",
+                (BiFunction<MemorySession, MemoryLayout, MemorySegment>) (session, layout) -> {
+                    MemorySegment segment = session.allocate(layout);
+                    segment.set(C_FLOAT, 0, FLOAT_VALUE);
+                    segment.set(C_DOUBLE.withBitAlignment(32), 4, DOUBLE_VALUE);
+                    return segment;
+                },
+                (Consumer<MemorySegment>) segment -> {
+                    assertEquals(segment.get(C_FLOAT, 0), FLOAT_VALUE);
+                    assertEquals(segment.get(C_DOUBLE.withBitAlignment(32), 4), DOUBLE_VALUE);
                 }
             }
         };
     }
-
 }

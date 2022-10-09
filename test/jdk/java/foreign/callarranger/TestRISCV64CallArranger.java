@@ -39,6 +39,7 @@ import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemoryAddress;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
+
 import jdk.internal.foreign.abi.Binding;
 import jdk.internal.foreign.abi.CallingSequence;
 import jdk.internal.foreign.abi.VMStorage;
@@ -51,8 +52,6 @@ import java.lang.invoke.MethodType;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 import static jdk.internal.foreign.PlatformLayouts.LinuxRISCV64.*;
 import static jdk.internal.foreign.abi.Binding.*;
-
-
 import static jdk.internal.foreign.abi.riscv64.RISCV64Architecture.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -109,9 +108,9 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
                                               int.class, int.class, int.class, int.class,
                                               int.class, int.class);
         FunctionDescriptor fd = FunctionDescriptor.ofVoid(
-                C_INT, C_INT, C_INT, C_INT,
-                C_INT, C_INT, C_INT, C_INT,
-                C_INT, C_INT);
+            C_INT, C_INT, C_INT, C_INT,
+            C_INT, C_INT, C_INT, C_INT,
+            C_INT, C_INT);
         LinuxRISCV64CallArranger.Bindings bindings = LinuxRISCV64CallArranger.getBindings(mt, fd, false);
 
         assertFalse(bindings.isInMemoryReturn);
@@ -140,8 +139,7 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
     public void testTwoIntTwoFloat() {
         MethodType mt = MethodType.methodType(void.class,
                                               int.class, int.class, float.class, float.class);
-        FunctionDescriptor fd = FunctionDescriptor.ofVoid(
-                C_INT, C_INT, C_FLOAT, C_FLOAT);
+        FunctionDescriptor fd = FunctionDescriptor.ofVoid(C_INT, C_INT, C_FLOAT, C_FLOAT);
         LinuxRISCV64CallArranger.Bindings bindings = LinuxRISCV64CallArranger.getBindings(mt, fd, false);
 
         assertFalse(bindings.isInMemoryReturn);
@@ -170,7 +168,7 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
         CallingSequence callingSequence = bindings.callingSequence;
         assertEquals(callingSequence.callerMethodType(), mt.insertParameterTypes(0, Addressable.class));
         assertEquals(callingSequence.functionDesc(), fd.insertArgumentLayouts(0, ADDRESS));
-        
+
         checkArgumentBindings(callingSequence, new Binding[][]{
             { unboxAddress(Addressable.class), vmStore(x29, long.class) },
             expectedBindings
@@ -185,37 +183,66 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
         MemoryLayout struct2 = MemoryLayout.structLayout(C_INT, C_INT, C_DOUBLE, C_INT);
         return new Object[][]{
             // struct s { int32_t a, b; double c; };
-            {MemoryLayout.structLayout(C_INT, C_INT, C_DOUBLE), new Binding[]{
-                dup(),
-                // s.a & s.b
-                bufferLoad(0, long.class), vmStore(Int64(x10), long.class),
-                // s.c
-                bufferLoad(8, long.class), vmStore(Int64(x11), long.class)
-            }},
-            // struct s { int32_t a, b; double c; int32_t d };
-            {struct2, new Binding[]{
-                copy(struct2),
-                unboxAddress(MemorySegment.class),
-                vmStore(Int64(x10), long.class)
-            }},
-            // struct s { int32_t a[1]; float b[1] };
-            {MemoryLayout.structLayout(MemoryLayout.sequenceLayout(1, C_INT),
-                                       MemoryLayout.sequenceLayout(1, C_FLOAT)), new Binding[]{
-                dup(),
-                // s.a[0]
-                bufferLoad(0, int.class), vmStore(Int32(x10), int.class),
-                // s.b[0]
-                bufferLoad(4, float.class), vmStore(Float32(f10), float.class)
-            }},
-            // struct s { float a; /* padding */ double b };
-            {MemoryLayout.structLayout(C_FLOAT, MemoryLayout.paddingLayout(32), C_DOUBLE),
+            { MemoryLayout.structLayout(C_INT, C_INT, C_DOUBLE),
                 new Binding[]{
+                    dup(),
+                    // s.a & s.b
+                    bufferLoad(0, long.class), vmStore(Int64(x10), long.class),
+                    // s.c
+                    bufferLoad(8, long.class), vmStore(Int64(x11), long.class)
+                }
+            },
+            // struct s { int32_t a, b; double c; int32_t d; };
+            { struct2,
+                new Binding[]{
+                    copy(struct2),
+                    unboxAddress(MemorySegment.class),
+                    vmStore(Int64(x10), long.class)
+                }
+            },
+            // struct s { int32_t a[1]; float b[1]; };
+            { MemoryLayout.structLayout(MemoryLayout.sequenceLayout(1, C_INT),
+                                        MemoryLayout.sequenceLayout(1, C_FLOAT)),
+                new Binding[]{
+                    dup(),
+                    // s.a[0]
+                    bufferLoad(0, int.class), vmStore(Int32(x10), int.class),
+                    // s.b[0]
+                    bufferLoad(4, float.class), vmStore(Float32(f10), float.class)
+                }
+            },
+
+            // struct s { float a; /* padding */ double b };
+            { MemoryLayout.structLayout(C_FLOAT, MemoryLayout.paddingLayout(32), C_DOUBLE),
+                new Binding[]{
+                    dup(),
+                    // s.a
+                    bufferLoad(0, float.class), vmStore(Float32(f10), float.class),
+                    // s.b
+                    bufferLoad(8, double.class), vmStore(Float64(f11), double.class),
+                }
+            },
+
+            // struct __attribute__((__packed__)) s { float a; double b; };
+            { MemoryLayout.structLayout(C_FLOAT, C_DOUBLE), new Binding[]{
                 dup(),
                 // s.a
                 bufferLoad(0, float.class), vmStore(Float32(f10), float.class),
                 // s.b
-                bufferLoad(8, double.class), vmStore(Float64(f11), double.class),
-            }},
+                bufferLoad(4, double.class), vmStore(Float64(f11), double.class),
+            }
+            },
+            // struct s { float a; float b __attribute__ ((aligned (8))); }
+            { MemoryLayout.structLayout(C_FLOAT, MemoryLayout.paddingLayout(32),
+                                        C_FLOAT, MemoryLayout.paddingLayout(32)),
+                new Binding[]{
+                    dup(),
+                    // s.a
+                    bufferLoad(0, float.class), vmStore(Float32(f10), float.class),
+                    // s.b
+                    bufferLoad(8, float.class), vmStore(Float32(f11), float.class),
+                }
+            }
         };
     }
 
@@ -294,7 +321,42 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
             bufferStore(4, double.class)
         });
     }
-    
+
+    @Test
+    void spillFloatingPointStruct() {
+        MemoryLayout struct = MemoryLayout.structLayout(C_FLOAT, C_FLOAT);
+        // void f(float, float, float, float, float, float, float, struct)
+        MethodType mt = MethodType.methodType(void.class, float.class, float.class,
+                                              float.class, float.class, float.class,
+                                              float.class, float.class, MemorySegment.class);
+        FunctionDescriptor fd = FunctionDescriptor.ofVoid(C_FLOAT, C_FLOAT, C_FLOAT, C_FLOAT,
+                                                          C_FLOAT, C_FLOAT, C_FLOAT, struct);
+        LinuxRISCV64CallArranger.Bindings bindings = LinuxRISCV64CallArranger.getBindings(mt, fd, false);
+
+        assertFalse(bindings.isInMemoryReturn);
+        CallingSequence callingSequence = bindings.callingSequence;
+        assertEquals(callingSequence.callerMethodType(), mt.insertParameterTypes(0, Addressable.class));
+        assertEquals(callingSequence.functionDesc(), fd.insertArgumentLayouts(0, ADDRESS));
+
+        checkArgumentBindings(callingSequence, new Binding[][]{
+            { unboxAddress(Addressable.class), vmStore(x29, long.class) },
+            { vmStore(Float32(f10), float.class) },
+            { vmStore(Float32(f11), float.class) },
+            { vmStore(Float32(f12), float.class) },
+            { vmStore(Float32(f13), float.class) },
+            { vmStore(Float32(f14), float.class) },
+            { vmStore(Float32(f15), float.class) },
+            { vmStore(Float32(f16), float.class) },
+            {
+                bufferLoad(0, long.class),
+                vmStore(Int64(x10), long.class),
+            }
+        });
+
+        checkReturnBindings(callingSequence, new Binding[]{});
+
+    }
+
     @Test
     public void testStructBoth() {
         MemoryLayout struct = MemoryLayout.structLayout(C_INT, C_FLOAT);
@@ -335,7 +397,7 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
 
         checkReturnBindings(callingSequence, new Binding[]{});
     }
-    
+
     @Test
     public void testStructStackSpill() {
         // A large (> 16 byte) struct argument that is spilled to the
@@ -345,10 +407,10 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
         MemoryLayout struct = MemoryLayout.structLayout(C_INT, C_INT, C_DOUBLE, C_INT);
 
         MethodType mt = MethodType.methodType(
-                void.class, MemorySegment.class, MemorySegment.class, int.class, int.class,
-                int.class, int.class, int.class, int.class, MemorySegment.class, int.class);
+            void.class, MemorySegment.class, MemorySegment.class, int.class, int.class,
+            int.class, int.class, int.class, int.class, MemorySegment.class, int.class);
         FunctionDescriptor fd = FunctionDescriptor.ofVoid(
-                struct, struct, C_INT, C_INT, C_INT, C_INT, C_INT, C_INT, struct, C_INT);
+            struct, struct, C_INT, C_INT, C_INT, C_INT, C_INT, C_INT, struct, C_INT);
         LinuxRISCV64CallArranger.Bindings bindings = LinuxRISCV64CallArranger.getBindings(mt, fd, false);
 
         assertFalse(bindings.isInMemoryReturn);
@@ -372,7 +434,7 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
 
         checkReturnBindings(callingSequence, new Binding[]{});
     }
-    
+
     @Test
     public void testVarArgsInRegs() {
         MethodType mt = MethodType.methodType(void.class, int.class, int.class, float.class);
@@ -395,14 +457,14 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
 
         checkReturnBindings(callingSequence, new Binding[]{});
     }
-    
+
     @Test
     public void testReturnStruct1() {
         MemoryLayout struct = MemoryLayout.structLayout(C_LONG, C_LONG, C_FLOAT);
 
         MethodType mt = MethodType.methodType(MemorySegment.class, int.class, int.class, float.class);
         FunctionDescriptor fd = FunctionDescriptor.of(struct, C_INT, C_INT, C_FLOAT);
-            LinuxRISCV64CallArranger.Bindings bindings = LinuxRISCV64CallArranger.getBindings(mt, fd, false);
+        LinuxRISCV64CallArranger.Bindings bindings = LinuxRISCV64CallArranger.getBindings(mt, fd, false);
 
         assertTrue(bindings.isInMemoryReturn);
         CallingSequence callingSequence = bindings.callingSequence;
