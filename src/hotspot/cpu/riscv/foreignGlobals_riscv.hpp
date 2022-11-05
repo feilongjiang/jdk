@@ -26,6 +26,42 @@
 #ifndef CPU_RISCV_FOREIGN_GLOBALS_RISCV_HPP
 #define CPU_RISCV_FOREIGN_GLOBALS_RISCV_HPP
 
-class ABIDescriptor {};
+#include "asm/macroAssembler.hpp"
+#include "utilities/growableArray.hpp"
+
+struct ABIDescriptor {
+  GrowableArray<Register> _integer_argument_registers;
+  GrowableArray<Register> _integer_return_registers;
+
+  GrowableArray<FloatRegister> _float_argument_registers;
+  GrowableArray<FloatRegister> _float_return_registers;
+
+  GrowableArray<Register> _integer_additional_volatile_registers;
+  GrowableArray<FloatRegister> _float_additional_volatile_registers;
+
+  int32_t _stack_alignment_bytes;
+  int32_t _shadow_space_bytes;
+
+  Register _target_addr_reg;
+  Register _ret_buf_addr_reg;
+
+  bool is_volatile_reg(Register reg) const;
+  bool is_volatile_reg(FloatRegister reg) const;
+};
+
+enum class RegType {
+  INTEGER = 0,
+  FLOAT = 1 << 8,
+  STACK = 2 << 8
+};
+
+enum class StorageClass {
+  INTEGER_8 = static_cast<int>(RegType::INTEGER) | 8,
+  INTEGER_16 = static_cast<int>(RegType::INTEGER) | 16,
+  INTEGER_32 = static_cast<int>(RegType::INTEGER) | 32,
+  INTEGER_64 = static_cast<int>(RegType::INTEGER) | 64,
+  FLOAT_32 = static_cast<int>(RegType::FLOAT) | 32,
+  FLOAT_64 = static_cast<int>(RegType::FLOAT) | 64
+};
 
 #endif // CPU_RISCV_FOREIGN_GLOBALS_RISCV_HPP
