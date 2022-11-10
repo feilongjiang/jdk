@@ -60,32 +60,6 @@ public class LinuxRISCV64CallArranger {
             x30  // ret buf addr reg
     );
 
-    // Make registers as prototype, create vmstorages with same index with registers.
-    static Map.Entry<Integer, VMStorage[]> buildStorageEntry(int storageClass, VMStorage[][] storagePrototypes) {
-        VMStorage[] prototypes = storagePrototypes[storageClass >> 8];
-        VMStorage[] result = new VMStorage[prototypes.length];
-        for (int i = 0; i < prototypes.length; i++) {
-            result[i] = new VMStorage(storageClass, prototypes[i].index(), prototypes[i].name());
-        }
-        return Map.entry(storageClass, result);
-    }
-
-    // Code below will not declare new registers.
-    static final Map<Integer, VMStorage[]> inputStorage = Map.ofEntries(
-            buildStorageEntry(StorageClasses.INTEGER_8, CLinux.inputStorage),
-            buildStorageEntry(StorageClasses.INTEGER_16, CLinux.inputStorage),
-            buildStorageEntry(StorageClasses.INTEGER_32, CLinux.inputStorage),
-            buildStorageEntry(StorageClasses.INTEGER_64, CLinux.inputStorage),
-            buildStorageEntry(StorageClasses.FLOAT_32, CLinux.inputStorage),
-            buildStorageEntry(StorageClasses.FLOAT_64, CLinux.inputStorage)
-    );
-
-    static Map<Integer, VMStorage[]> outputStorage = inputStorage;
-
-    static int regType(int storageClass) {
-        return (storageClass >> 8) << 8;
-    }
-
     public static class Bindings {
         public final CallingSequence callingSequence;
         public final boolean isInMemoryReturn;
@@ -174,14 +148,13 @@ public class LinuxRISCV64CallArranger {
         }
 
         Optional<VMStorage> regAlloc(int storageClass) {
-            int nRegsIdx = storageClass >> 8;
-            var availableRegs = MAX_REGISTER_ARGUMENTS - nRegs[nRegsIdx];
+            var availableRegs = MAX_REGISTER_ARGUMENTS - nRegs[storageClass];
             if (availableRegs > 0) {
                 VMStorage[] source =
-                        (forArguments ? inputStorage : outputStorage).get(storageClass);
+                        (forArguments ? CLinux.inputStorage : CLinux.outputStorage)[storageClass];
                 Optional<VMStorage> result =
-                        Optional.of(source[nRegs[nRegsIdx]]);
-                nRegs[nRegsIdx] += 1;
+                        Optional.of(source[nRegs[storageClass]]);
+                nRegs[storageClass] += 1;
                 return result;
             }
             return Optional.empty();
@@ -193,7 +166,7 @@ public class LinuxRISCV64CallArranger {
             if (storage.isPresent()) return storage.get();
             // If storageClass is RegTypes.FLOAT, and no floating-point register is available,
             // try to allocate an integer register.
-            if (regType(storageClass) == RegTypes.FLOAT) {
+            if (storageClass == StorageClasses.FLOAT) {
                 storage = regAlloc(StorageClasses.toIntegerClass(storageClass));
                 if (storage.isPresent()) return storage.get();
             }
@@ -205,7 +178,7 @@ public class LinuxRISCV64CallArranger {
             VMStorage[] storages = new VMStorage[regCnt];
             for (int i = 0; i < regCnt; i++) {
                 // use integer calling convention.
-                storages[i] = getStorage(StorageClasses.INTEGER_64);
+                storages[i] = getStorage(StorageClasses.INTEGER);
             }
             return storages;
         }
@@ -240,8 +213,7 @@ public class LinuxRISCV64CallArranger {
         // Variadic arguments are passed according to the integer calling convention.
         // When handling variadic part, integer calling convention should be used.
         static final Map<TypeClass, TypeClass> conventionConverterMap =
-                Map.ofEntries(Map.entry(FLOAT_32, INTEGER_32),
-                              Map.entry(FLOAT_64, INTEGER_64),
+                Map.ofEntries(Map.entry(FLOAT, INTEGER),
                               Map.entry(STRUCT_FA, STRUCT_A),
                               Map.entry(STRUCT_BOTH, STRUCT_A));
     }
@@ -267,14 +239,14 @@ public class LinuxRISCV64CallArranger {
             // Binding.Builder will build a series of operation. Its working style like a stack interpreter.
             Binding.Builder bindings = Binding.builder();
             switch (argumentClass) {
-                case INTEGER_8, INTEGER_16, INTEGER_32, INTEGER_64, FLOAT_32, FLOAT_64 -> {
+                case INTEGER, FLOAT -> {
                     VMStorage storage = storageCalculator.getStorage(StorageClasses.fromTypeClass(argumentClass));
                     bindings.vmStore(storage, carrier);
                 }
 
                 case POINTER -> {
                     bindings.unboxAddress(carrier);
-                    VMStorage storage = storageCalculator.getStorage(StorageClasses.INTEGER_64);
+                    VMStorage storage = storageCalculator.getStorage(StorageClasses.INTEGER);
                     bindings.vmStore(storage, long.class);
                 }
 
@@ -287,7 +259,7 @@ public class LinuxRISCV64CallArranger {
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
+                        boolean useFloat = storage.type() == StorageClasses.FLOAT;
                         Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
                         if (offset + copy < layout.byteSize()) {
                             bindings.dup();
@@ -340,7 +312,7 @@ public class LinuxRISCV64CallArranger {
                     bindings.copy(layout)
                             .unboxAddress(MemorySegment.class);
                     VMStorage storage = storageCalculator.getStorage(
-                            StorageClasses.INTEGER_64);
+                            StorageClasses.INTEGER);
                     bindings.vmStore(storage, long.class);
                 }
 
@@ -368,13 +340,13 @@ public class LinuxRISCV64CallArranger {
         List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, TypeClass argumentClass) {
             Binding.Builder bindings = Binding.builder();
             switch (argumentClass) {
-                case INTEGER_8, INTEGER_16, INTEGER_32, INTEGER_64, FLOAT_32, FLOAT_64 -> {
+                case INTEGER, FLOAT -> {
                     VMStorage storage = storageCalculator.getStorage(StorageClasses.fromTypeClass(argumentClass));
                     bindings.vmLoad(storage, carrier);
                 }
 
                 case POINTER -> {
-                    VMStorage storage = storageCalculator.getStorage(StorageClasses.INTEGER_64);
+                    VMStorage storage = storageCalculator.getStorage(StorageClasses.INTEGER);
                     bindings.vmLoad(storage, long.class)
                             .boxAddress();
                 }
@@ -389,7 +361,7 @@ public class LinuxRISCV64CallArranger {
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = regType(storage.type()) == RegTypes.FLOAT;
+                        boolean useFloat = storage.type() == StorageClasses.FLOAT;
                         Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
                         bindings.dup().vmLoad(storage, type)
                                 .bufferStore(offset, type);
@@ -437,7 +409,7 @@ public class LinuxRISCV64CallArranger {
                 case STRUCT_REFERENCE -> {
                     assert carrier == MemorySegment.class;
                     VMStorage storage = storageCalculator.getStorage(
-                            StorageClasses.INTEGER_64);
+                            StorageClasses.INTEGER);
                     bindings.vmLoad(storage, long.class)
                             .boxAddress()
                             .toSegment(layout);

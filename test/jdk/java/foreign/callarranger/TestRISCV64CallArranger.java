@@ -41,7 +41,6 @@ import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import jdk.internal.foreign.abi.Binding;
 import jdk.internal.foreign.abi.CallingSequence;
-import jdk.internal.foreign.abi.VMStorage;
 import jdk.internal.foreign.abi.riscv64.linux.LinuxRISCV64CallArranger;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -57,30 +56,6 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 public class TestRISCV64CallArranger extends CallArrangerTestBase {
-
-    static VMStorage Int8(VMStorage reg) {
-        return new VMStorage(StorageClasses.INTEGER_8, reg.index(), reg.name());
-    }
-
-    static VMStorage Int16(VMStorage reg) {
-        return new VMStorage(StorageClasses.INTEGER_16, reg.index(), reg.name());
-    }
-
-    static VMStorage Int32(VMStorage reg) {
-        return new VMStorage(StorageClasses.INTEGER_32, reg.index(), reg.name());
-    }
-
-    static VMStorage Int64(VMStorage reg) {
-        return new VMStorage(StorageClasses.INTEGER_64, reg.index(), reg.name());
-    }
-
-    static VMStorage Float32(VMStorage reg) {
-        return new VMStorage(StorageClasses.FLOAT_32, reg.index(), reg.name());
-    }
-
-    static VMStorage Float64(VMStorage reg) {
-        return new VMStorage(StorageClasses.FLOAT_64, reg.index(), reg.name());
-    }
 
     @Test
     public void testEmpty() {
@@ -119,14 +94,14 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
 
         checkArgumentBindings(callingSequence, new Binding[][]{
             { unboxAddress(Addressable.class), vmStore(x29, long.class) },
-            { vmStore(Int8(x10), byte.class) },
-            { vmStore(Int16(x11), short.class) },
-            { vmStore(Int32(x12), int.class) },
-            { vmStore(Int32(x13), int.class) },
-            { vmStore(Int32(x14), int.class) },
-            { vmStore(Int32(x15), int.class) },
-            { vmStore(Int64(x16), long.class) },
-            { vmStore(Int32(x17), int.class) },
+            { vmStore(x10, byte.class) },
+            { vmStore(x11, short.class) },
+            { vmStore(x12, int.class) },
+            { vmStore(x13, int.class) },
+            { vmStore(x14, int.class) },
+            { vmStore(x15, int.class) },
+            { vmStore(x16, long.class) },
+            { vmStore(x17, int.class) },
             { vmStore(stackStorage(0), int.class) },
             { vmStore(stackStorage(1), byte.class) }
         });
@@ -147,10 +122,10 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
 
         checkArgumentBindings(callingSequence, new Binding[][]{
             { unboxAddress(Addressable.class), vmStore(x29, long.class) },
-            { vmStore(Int32(x10), int.class) },
-            { vmStore(Int32(x11), int.class) },
-            { vmStore(Float32(f10), float.class) },
-            { vmStore(Float32(f11), float.class) }
+            { vmStore(x10, int.class) },
+            { vmStore(x11, int.class) },
+            { vmStore(f10, float.class) },
+            { vmStore(f11, float.class) }
         });
 
         checkReturnBindings(callingSequence, new Binding[]{});
@@ -184,9 +159,9 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
                 new Binding[]{
                     dup(),
                     // s.a & s.b
-                    bufferLoad(0, long.class), vmStore(Int64(x10), long.class),
+                    bufferLoad(0, long.class), vmStore(x10, long.class),
                     // s.c
-                    bufferLoad(8, long.class), vmStore(Int64(x11), long.class)
+                    bufferLoad(8, long.class), vmStore(x11, long.class)
                 }
             },
             // struct s { int32_t a, b; double c; int32_t d; };
@@ -194,7 +169,7 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
                 new Binding[]{
                     copy(struct1),
                     unboxAddress(MemorySegment.class),
-                    vmStore(Int64(x10), long.class)
+                    vmStore(x10, long.class)
                 }
             },
             // struct s { int32_t a[1]; float b[1]; };
@@ -203,9 +178,9 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
                 new Binding[]{
                     dup(),
                     // s.a[0]
-                    bufferLoad(0, int.class), vmStore(Int32(x10), int.class),
+                    bufferLoad(0, int.class), vmStore(x10, int.class),
                     // s.b[0]
-                    bufferLoad(4, float.class), vmStore(Float32(f10), float.class)
+                    bufferLoad(4, float.class), vmStore(f10, float.class)
                 }
             },
             // struct s { float a; /* padding */ double b };
@@ -213,9 +188,9 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
                 new Binding[]{
                     dup(),
                     // s.a
-                    bufferLoad(0, float.class), vmStore(Float32(f10), float.class),
+                    bufferLoad(0, float.class), vmStore(f10, float.class),
                     // s.b
-                    bufferLoad(8, double.class), vmStore(Float64(f11), double.class),
+                    bufferLoad(8, double.class), vmStore(f11, double.class),
                 }
             },
             // struct __attribute__((__packed__)) s { float a; double b; };
@@ -223,9 +198,9 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
                 new Binding[]{
                     dup(),
                     // s.a
-                    bufferLoad(0, float.class), vmStore(Float32(f10), float.class),
+                    bufferLoad(0, float.class), vmStore(f10, float.class),
                     // s.b
-                    bufferLoad(4, double.class), vmStore(Float64(f11), double.class),
+                    bufferLoad(4, double.class), vmStore(f11, double.class),
                 }
             },
             // struct s { float a; float b __attribute__ ((aligned (8))); }
@@ -234,9 +209,9 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
                 new Binding[]{
                     dup(),
                     // s.a
-                    bufferLoad(0, float.class), vmStore(Float32(f10), float.class),
+                    bufferLoad(0, float.class), vmStore(f10, float.class),
                     // s.b
-                    bufferLoad(8, float.class), vmStore(Float32(f11), float.class),
+                    bufferLoad(8, float.class), vmStore(f11, float.class),
                 }
             }
         };
@@ -258,24 +233,24 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
         checkArgumentBindings(callingSequence, new Binding[][]{
             { unboxAddress(MemorySegment.class), vmStore(x30, long.class) },
             { unboxAddress(Addressable.class), vmStore(x29, long.class) },
-            { vmStore(Float32(f10), float.class) },
-            { vmStore(Int32(x10), int.class) },
+            { vmStore(f10, float.class) },
+            { vmStore(x10, int.class) },
             {
                 dup(),
                 bufferLoad(0, float.class),
-                vmStore(Float32(f11), float.class),
+                vmStore(f11, float.class),
                 bufferLoad(4, float.class),
-                vmStore(Float32(f12), float.class)
+                vmStore(f12, float.class)
             }
         });
 
         checkReturnBindings(callingSequence, new Binding[]{
             allocate(fa),
             dup(),
-            vmLoad(Float32(f10), float.class),
+            vmLoad(f10, float.class),
             bufferStore(0, float.class),
             dup(),
-            vmLoad(Float32(f11), float.class),
+            vmLoad(f11, float.class),
             bufferStore(4, float.class)
         });
     }
@@ -296,24 +271,24 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
         checkArgumentBindings(callingSequence, new Binding[][]{
             { unboxAddress(MemorySegment.class), vmStore(x30, long.class) },
             { unboxAddress(Addressable.class), vmStore(x29, long.class) },
-            { vmStore(Float32(f10), float.class) },
-            { vmStore(Int32(x10), int.class) },
+            { vmStore(f10, float.class) },
+            { vmStore(x10, int.class) },
             {
                 dup(),
                 bufferLoad(0, float.class),
-                vmStore(Float32(f11), float.class),
+                vmStore(f11, float.class),
                 bufferLoad(4, double.class),
-                vmStore(Float64(f12), double.class)
+                vmStore(f12, double.class)
             }
         });
 
         checkReturnBindings(callingSequence, new Binding[]{
             allocate(fa),
             dup(),
-            vmLoad(Float32(f10), float.class),
+            vmLoad(f10, float.class),
             bufferStore(0, float.class),
             dup(),
-            vmLoad(Float64(f11), double.class),
+            vmLoad(f11, double.class),
             bufferStore(4, double.class)
         });
     }
@@ -336,16 +311,16 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
 
         checkArgumentBindings(callingSequence, new Binding[][]{
             { unboxAddress(Addressable.class), vmStore(x29, long.class) },
-            { vmStore(Float32(f10), float.class) },
-            { vmStore(Float32(f11), float.class) },
-            { vmStore(Float32(f12), float.class) },
-            { vmStore(Float32(f13), float.class) },
-            { vmStore(Float32(f14), float.class) },
-            { vmStore(Float32(f15), float.class) },
-            { vmStore(Float32(f16), float.class) },
+            { vmStore(f10, float.class) },
+            { vmStore(f11, float.class) },
+            { vmStore(f12, float.class) },
+            { vmStore(f13, float.class) },
+            { vmStore(f14, float.class) },
+            { vmStore(f15, float.class) },
+            { vmStore(f16, float.class) },
             {
                 bufferLoad(0, long.class),
-                vmStore(Int64(x10), long.class)
+                vmStore(x10, long.class)
             }
         });
 
@@ -370,23 +345,23 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
             {
                 dup(),
                 bufferLoad(0, int.class),
-                vmStore(Int32(x10), int.class),
+                vmStore(x10, int.class),
                 bufferLoad(4, float.class),
-                vmStore(Float32(f10), float.class)
+                vmStore(f10, float.class)
             },
             {
                 dup(),
                 bufferLoad(0, int.class),
-                vmStore(Int32(x11), int.class),
+                vmStore(x11, int.class),
                 bufferLoad(4, float.class),
-                vmStore(Float32(f11), float.class)
+                vmStore(f11, float.class)
             },
             {
                 dup(),
                 bufferLoad(0, int.class),
-                vmStore(Int32(x12), int.class),
+                vmStore(x12, int.class),
                 bufferLoad(4, float.class),
-                vmStore(Float32(f12), float.class)
+                vmStore(f12, float.class)
             }
         });
 
@@ -415,14 +390,14 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
 
         checkArgumentBindings(callingSequence, new Binding[][]{
             { unboxAddress(Addressable.class), vmStore(x29, long.class) },
-            { copy(struct), unboxAddress(MemorySegment.class), vmStore(Int64(x10), long.class) },
-            { copy(struct), unboxAddress(MemorySegment.class), vmStore(Int64(x11), long.class) },
-            { vmStore(Int32(x12), int.class) },
-            { vmStore(Int32(x13), int.class) },
-            { vmStore(Int32(x14), int.class) },
-            { vmStore(Int32(x15), int.class) },
-            { vmStore(Int32(x16), int.class) },
-            { vmStore(Int32(x17), int.class) },
+            { copy(struct), unboxAddress(MemorySegment.class), vmStore(x10, long.class) },
+            { copy(struct), unboxAddress(MemorySegment.class), vmStore(x11, long.class) },
+            { vmStore(x12, int.class) },
+            { vmStore(x13, int.class) },
+            { vmStore(x14, int.class) },
+            { vmStore(x15, int.class) },
+            { vmStore(x16, int.class) },
+            { vmStore(x17, int.class) },
             { copy(struct), unboxAddress(MemorySegment.class), vmStore(stackStorage(0), long.class) },
             { vmStore(stackStorage(1), int.class) }
         });
@@ -445,9 +420,9 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
         // This is identical to the non-variadic calling sequence
         checkArgumentBindings(callingSequence, new Binding[][]{
             { unboxAddress(Addressable.class), vmStore(x29, long.class) },
-            { vmStore(Int32(x10), int.class) },
-            { vmStore(Int32(x11), int.class) },
-            { vmStore(Int32(x12), float.class) }
+            { vmStore(x10, int.class) },
+            { vmStore(x11, int.class) },
+            { vmStore(x12, float.class) }
         });
 
         checkReturnBindings(callingSequence, new Binding[]{});
@@ -474,14 +449,14 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
         // This is identical to the non-variadic calling sequence
         checkArgumentBindings(callingSequence, new Binding[][]{
             { unboxAddress(Addressable.class), vmStore(x29, long.class) },
-            { vmStore(Int32(x10), int.class) },
-            { vmStore(Int32(x11), int.class) },
-            { vmStore(Int32(x12), int.class) },
-            { vmStore(Int64(x13), double.class) },
-            { vmStore(Int64(x14), double.class) },
-            { vmStore(Int64(x15), long.class) },
-            { vmStore(Int64(x16), long.class) },
-            { vmStore(Int32(x17), int.class) },
+            { vmStore(x10, int.class) },
+            { vmStore(x11, int.class) },
+            { vmStore(x12, int.class) },
+            { vmStore(x13, double.class) },
+            { vmStore(x14, double.class) },
+            { vmStore(x15, long.class) },
+            { vmStore(x16, long.class) },
+            { vmStore(x17, int.class) },
             { vmStore(stackStorage(0), double.class) },
             { vmStore(stackStorage(1), double.class) },
             { vmStore(stackStorage(2), long.class) }
@@ -508,10 +483,10 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
 
         checkArgumentBindings(callingSequence, new Binding[][]{
             { unboxAddress(Addressable.class), vmStore(x29, long.class) },
-            { unboxAddress(), vmStore(Int64(x10), long.class) },
-            { vmStore(Int32(x11), int.class) },
-            { vmStore(Int32(x12), int.class) },
-            { vmStore(Float32(f10), float.class) }
+            { unboxAddress(), vmStore(x10, long.class) },
+            { vmStore(x11, int.class) },
+            { vmStore(x12, int.class) },
+            { vmStore(f10, float.class) }
         });
 
         checkReturnBindings(callingSequence, new Binding[]{});
@@ -538,10 +513,10 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
         checkReturnBindings(callingSequence, new Binding[]{
             allocate(struct),
             dup(),
-            vmLoad(Int64(x10), long.class),
+            vmLoad(x10, long.class),
             bufferStore(0, long.class),
             dup(),
-            vmLoad(Int64(x11), long.class),
+            vmLoad(x11, long.class),
             bufferStore(8, long.class)
         });
     }
