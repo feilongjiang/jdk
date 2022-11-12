@@ -164,7 +164,7 @@ public class LinuxRISCV64CallArranger {
         VMStorage getStorage(int storageClass) {
             Optional<VMStorage> storage = regAlloc(storageClass);
             if (storage.isPresent()) return storage.get();
-            // If storageClass is RegTypes.FLOAT, and no floating-point register is available,
+            // If storageClass is StorageClasses.FLOAT, and no floating-point register is available,
             // try to allocate an integer register.
             if (storageClass == StorageClasses.FLOAT) {
                 storage = regAlloc(StorageClasses.toIntegerClass(storageClass));
@@ -210,7 +210,6 @@ public class LinuxRISCV64CallArranger {
 
         abstract List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, boolean isVariadicArg);
 
-        // Variadic arguments are passed according to the integer calling convention.
         // When handling variadic part, integer calling convention should be used.
         static final Map<TypeClass, TypeClass> conventionConverterMap =
                 Map.ofEntries(Map.entry(FLOAT, INTEGER),
@@ -236,7 +235,6 @@ public class LinuxRISCV64CallArranger {
         }
 
         List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, TypeClass argumentClass) {
-            // Binding.Builder will build a series of operation. Its working style like a stack interpreter.
             Binding.Builder bindings = Binding.builder();
             switch (argumentClass) {
                 case INTEGER, FLOAT -> {

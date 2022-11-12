@@ -125,7 +125,6 @@ public enum TypeClass {
     private static List<FlattenedFieldDesc> getFlattenedFieldsInner(long offset, MemoryLayout layout) {
         if (layout instanceof ValueLayout valueLayout) {
             TypeClass typeClass = classifyValueType(valueLayout);
-            // TODO -- test what happen, when pass into a pointer data.
             return List.of(switch (typeClass) {
                 case INTEGER, FLOAT ->
                         new FlattenedFieldDesc(typeClass, offset, valueLayout);
@@ -195,7 +194,6 @@ public enum TypeClass {
         else return STRUCT_A;
     }
 
-    // Classify argument pass style.
     static TypeClass classifyLayout(MemoryLayout type) {
         if (type instanceof ValueLayout vt) {
             return classifyValueType(vt);

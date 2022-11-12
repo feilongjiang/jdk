@@ -154,6 +154,15 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
     public static Object[][] structs() {
         MemoryLayout struct1 = MemoryLayout.structLayout(C_INT, C_INT, C_DOUBLE, C_INT);
         return new Object[][]{
+            // struct s { void* a; double c; };
+            {
+                MemoryLayout.structLayout(C_POINTER, C_DOUBLE),
+                new Binding[]{
+                    dup(),
+                    bufferLoad(0, long.class), vmStore(x10, long.class),
+                    bufferLoad(8, long.class), vmStore(x11, long.class)
+                }
+            },
             // struct s { int32_t a, b; double c; };
             { MemoryLayout.structLayout(C_INT, C_INT, C_DOUBLE),
                 new Binding[]{

@@ -219,8 +219,16 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
     assert(ret_buf_offset != -1, "no return buffer allocated");
     __ la(abi._ret_buf_addr_reg, Address(sp, ret_buf_offset));
 
-    // fill all bits of return buffer with 1s.
-    __ li(t0, 0XFFFFFFFFFFFFFFFF);
+    // When copy a floating-point data from memory into floating-point register,
+    // flw and fld have different behaviors.
+    // flw will copy a 32-bit data into register and fill upper 32 bits of the register with 1s,
+    // however, fld will copy a 64-bit data without any alternation.
+    // Because we do not kown the type of data being copied, we fill all bits of return buffer with 1s.
+    // Hence, a 32-bit floating-point data also can be copied by fld, its upper 32 bits has been
+    // filled with 1s ahead of time.
+    //
+    // See https://five-embeddev.com/riscv-isa-manual/latest/d.html#nanboxing
+    __ li(t0, -1L);
     int offset = 0;
     int unfilled_ret_buf_size = ret_buf_size;
     while (unfilled_ret_buf_size >= 8) {
