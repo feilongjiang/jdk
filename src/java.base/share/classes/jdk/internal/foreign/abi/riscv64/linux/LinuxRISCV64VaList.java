@@ -102,7 +102,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
         checkStackElement(layout);
         preAlignStack();
         return switch (typeClass) {
-            case INTEGER_8, INTEGER_16, INTEGER_32, INTEGER_64, FLOAT_32, FLOAT_64, POINTER -> {
+            case INTEGER, FLOAT, POINTER -> {
                 VarHandle reader = layout.varHandle();
                 MemorySegment slice = segment.asSlice(offset, layout.byteSize());
                 Object res = reader.get(slice);
@@ -151,7 +151,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList, Scoped {
             Objects.requireNonNull(layout);
             TypeClass typeClass = TypeClass.classifyLayout(layout);
             switch (typeClass) {
-                case INTEGER_8, INTEGER_16, INTEGER_32, INTEGER_64, FLOAT_32, FLOAT_64, POINTER, STRUCT_REFERENCE ->
+                case INTEGER, FLOAT, POINTER, STRUCT_REFERENCE ->
                         offset += 8;
                 case STRUCT_A, STRUCT_FA, STRUCT_BOTH -> offset += Utils.alignUp(layout.byteSize(), STACK_SLOT_SIZE);
             }

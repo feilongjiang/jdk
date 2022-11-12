@@ -53,46 +53,22 @@ public class RISCV64Architecture implements Architecture {
     // more fine-grained StorageClasses.
     //
     // Enumeration values of below two interfaces must consistent with riscv64 backend.
-    public interface RegTypes {
-        int INTEGER = 0;
-        int FLOAT = 1 << 8;
-        int STACK = 2 << 8;
-    }
-
-    // StorageClasses may look different from its counterpart in aarch64 and x86.
-    // Upper 16 bits is unused. Lower 16 bits is spilt 2 parts, the first part is regtype, the second part is width.
-    // regtype will determine what type of register will be allocated to the StorageClass, and width information will
-    // determine how riscv backend transfer data between memory and allocated register.
-    // | unused | RegType | width |
-    //  16 bits   8 bits    8 bits
     public interface StorageClasses {
-        int INTEGER_8 = RegTypes.INTEGER | 8;
-        int INTEGER_16 = RegTypes.INTEGER | 16;
-        int INTEGER_32 = RegTypes.INTEGER | 32;
-        int INTEGER_64 = RegTypes.INTEGER | 64;
-        int FLOAT_32 = RegTypes.FLOAT | 32;
-        int FLOAT_64 = RegTypes.FLOAT | 64;
-        int STACK_SLOT = RegTypes.STACK;
+        int INTEGER = 0;
+        int FLOAT = 1;
+        int STACK = 2;
 
         public static int fromTypeClass(TypeClass typeClass) {
             return switch (typeClass) {
-                case INTEGER_8 -> INTEGER_8;
-                case INTEGER_16 -> INTEGER_16;
-                case INTEGER_32 -> INTEGER_32;
-                case INTEGER_64, POINTER -> INTEGER_64;
-                case FLOAT_64 -> FLOAT_64;
-                case FLOAT_32 -> FLOAT_32;
+                case INTEGER, POINTER -> INTEGER;
+                case FLOAT -> FLOAT;
                 default -> -1;
             };
         }
 
         public static int toIntegerClass(int floatClass) {
-            assert floatClass == FLOAT_32 || floatClass == FLOAT_64;
-            return switch (floatClass) {
-                case FLOAT_32 -> INTEGER_32;
-                case FLOAT_64 -> INTEGER_64;
-                default -> -1;
-            };
+            assert floatClass == FLOAT;
+            return INTEGER;
         }
     }
 
@@ -164,36 +140,35 @@ public class RISCV64Architecture implements Architecture {
     public static final VMStorage f31 = floatRegister(31, "ft11");
 
     private static VMStorage integerRegister(int index, String debugName) {
-        return new VMStorage(RegTypes.INTEGER, index, debugName);
+        return new VMStorage(StorageClasses.INTEGER, index, debugName);
     }
 
     private static VMStorage floatRegister(int index, String debugName) {
-        return new VMStorage(RegTypes.FLOAT, index, debugName);
+        return new VMStorage(StorageClasses.FLOAT, index, debugName);
     }
 
     public static VMStorage stackStorage(int index) {
-        return new VMStorage(RegTypes.STACK, index, "Stack@" + index);
+        return new VMStorage(StorageClasses.STACK, index, "Stack@" + index);
     }
 
     @Override
     public boolean isStackType(int cls) {
-        return cls == RegTypes.STACK;
+        return cls == StorageClasses.STACK;
     }
 
     @Override
     public int typeSize(int cls) {
         return switch (cls) {
-            case StorageClasses.INTEGER_8, StorageClasses.INTEGER_16,
-                    StorageClasses.INTEGER_32, StorageClasses.INTEGER_64 -> INTEGER_REG_SIZE;
-            case StorageClasses.FLOAT_32, StorageClasses.FLOAT_64 -> FLOAT_REG_SIZE;
-            case StorageClasses.STACK_SLOT -> STACK_SLOT_SIZE;
+            case StorageClasses.INTEGER -> INTEGER_REG_SIZE;
+            case StorageClasses.FLOAT -> FLOAT_REG_SIZE;
+            case StorageClasses.STACK -> STACK_SLOT_SIZE;
             default -> throw new IllegalArgumentException("Invalid type: " + cls);
         };
     }
 
     @Override
     public int stackType() {
-        return RegTypes.STACK;
+        return StorageClasses.STACK;
     }
 
     public static ABIDescriptor abiFor(VMStorage[] inputIntRegs, VMStorage[] inputFloatRegs, VMStorage[] outputIntRegs,

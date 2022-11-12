@@ -113,20 +113,6 @@ static void restore_callee_saved_registers(MacroAssembler* _masm, const ABIDescr
   __ block_comment("} restore_callee_saved_regs ");
 }
 
-static GrowableArray<StorageClass> parse_reg_types(jobject jconv) {
-  oop conv_oop = JNIHandles::resolve_non_null(jconv);
-  objArrayOop ret_regs_oop = jdk_internal_foreign_abi_CallConv::retRegs(conv_oop);
-  int num_rets = ret_regs_oop->length();
-  GrowableArray<StorageClass> result{num_rets};
-  for (int i = 0; i < num_rets; i++) {
-    jint type = jdk_internal_foreign_abi_VMStorage::type(ret_regs_oop->obj_at(i));
-    assert(type >= static_cast<int>(StorageClass::INTEGER_8), "bad storage class.");
-    result.push(static_cast<StorageClass>(type));
-  }
-
-  return result;
-}
-
 // receive args from c function, and convert it into java calling convetion.
 address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
                                        BasicType* in_sig_bt, int total_in_args,
@@ -232,6 +218,29 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
   if (needs_return_buffer) {
     assert(ret_buf_offset != -1, "no return buffer allocated");
     __ la(abi._ret_buf_addr_reg, Address(sp, ret_buf_offset));
+
+    // When copy a floating-point data from memory into floating-point register,
+    // flw and fld have different behaviors:
+    //  - flw will copy a 32-bit data into register and fill upper 32 bits of the register with 1s
+    //  - fld will copy a 64-bit data without any alternation
+    // We might not know the current type of data being copied, so we fill all bits of return buffer with 1s.
+    // Therefore, a 32-bit floating-point data can also be copied by fld.
+    //
+    // See https://five-embeddev.com/riscv-isa-manual/latest/d.html#nanboxing
+    __ li(t0, -1L);
+    int offset = 0;
+    int unfilled_ret_buf_size = ret_buf_size;
+    while (unfilled_ret_buf_size >= 8) {
+      __ sd(t0, Address(sp, ret_buf_offset + offset));
+      offset += 8;
+      unfilled_ret_buf_size -= 8;
+    }
+    __ addi(t0, zr, 0XFF);
+    while (unfilled_ret_buf_size > 0) {
+      __ sb(t0, Address(sp, ret_buf_offset + offset));
+      offset++;
+      unfilled_ret_buf_size--;
+    }
   }
   // arg_shuffle will generate shuffle code that is used to
   // to check how argument shuffle works, use -Xlog:foreign+upcall=trace.
@@ -284,35 +293,16 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
     // move return value from return buffer to registers.
     assert(ret_buf_offset != -1, "no return buffer allocated");
     __ la(t0, Address(sp, ret_buf_offset));
-
-    GrowableArray<StorageClass> storages = parse_reg_types(jconv);
     int offset = 0;
-    assert(storages.length() == call_regs._ret_regs.length(), "inconsistent length.");
     for (int i = 0; i < call_regs._ret_regs.length(); i++) {
       VMReg reg = call_regs._ret_regs.at(i);
-      StorageClass regtype = storages.at(i);
-      switch (regtype) {
-        case StorageClass::FLOAT_32:
-          __ flw(reg->as_FloatRegister(), Address(t0, offset));
-          break;
-        case StorageClass::FLOAT_64:
-          __ fld(reg->as_FloatRegister(), Address(t0, offset));
-          break;
-        case StorageClass::INTEGER_8:
-          __ lb(reg->as_Register(), Address(t0, offset));
-          break;
-        case StorageClass::INTEGER_16:
-          __ lh(reg->as_Register(), Address(t0, offset));
-          break;
-        case StorageClass::INTEGER_32:
-          __ lw(reg->as_Register(), Address(t0, offset));
-          break;
-        case StorageClass::INTEGER_64:
-          __ ld(reg->as_Register(), Address(t0, offset));
-          break;
-        default:
-          ShouldNotReachHere();
-      }
+        if (reg->is_Register()) {
+            __ ld(reg->as_Register(), Address(t0, offset));
+        } else if (reg->is_FloatRegister()) {
+            __ fld(reg->as_FloatRegister(), Address(t0, offset));
+        } else {
+            ShouldNotReachHere();
+        }
       offset += 8;
     }
   }

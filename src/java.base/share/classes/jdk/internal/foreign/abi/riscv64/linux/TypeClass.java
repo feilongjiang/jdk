@@ -49,12 +49,8 @@ public enum TypeClass {
      *
      * See https://github.com/riscv-non-isa/riscv-elf-psabi-doc
      * */
-    INTEGER_8,
-    INTEGER_16,
-    INTEGER_32,
-    INTEGER_64,
-    FLOAT_32,
-    FLOAT_64,
+    INTEGER,
+    FLOAT,
     POINTER,
     STRUCT_A,
     STRUCT_FA,
@@ -76,8 +72,8 @@ public enum TypeClass {
         static FieldCounter flatten(MemoryLayout layout) {
             if (layout instanceof ValueLayout valueLayout) {
                 return switch (classifyValueType(valueLayout)) {
-                    case INTEGER_8, INTEGER_16, INTEGER_32, INTEGER_64 -> FieldCounter.SINGLE_INTEGER;
-                    case FLOAT_32, FLOAT_64 -> FieldCounter.SINGLE_FLOAT;
+                    case INTEGER -> FieldCounter.SINGLE_INTEGER;
+                    case FLOAT -> FieldCounter.SINGLE_FLOAT;
                     case POINTER -> FieldCounter.SINGLE_POINTER;
                     default -> {
                         assert false : "should not reach here.";
@@ -130,7 +126,7 @@ public enum TypeClass {
         if (layout instanceof ValueLayout valueLayout) {
             TypeClass typeClass = classifyValueType(valueLayout);
             return List.of(switch (typeClass) {
-                case INTEGER_8, INTEGER_16, INTEGER_32, INTEGER_64, FLOAT_32, FLOAT_64 ->
+                case INTEGER, FLOAT ->
                         new FlattenedFieldDesc(typeClass, offset, valueLayout);
                 default -> {
                     assert false : "should not reach here.";
@@ -168,22 +164,15 @@ public enum TypeClass {
     // ValueLayout will be classified by its carrier type.
     private static TypeClass classifyValueType(ValueLayout type) {
         Class<?> carrier = type.carrier();
-        if (carrier == boolean.class || carrier == byte.class) {
-            return INTEGER_8;
-        } else if (carrier == char.class || carrier == short.class) {
-            return INTEGER_16;
-        } else if (carrier == int.class) {
-            return INTEGER_32;
-        } else if (carrier == long.class) {
-            return INTEGER_64;
-        } else if (carrier == float.class) {
-            return FLOAT_32;
-        } else if (carrier == double.class) {
-            return FLOAT_64;
+        if (carrier == boolean.class || carrier == byte.class || carrier == char.class ||
+            carrier == short.class || carrier == int.class || carrier == long.class) {
+            return INTEGER;
+        } else if (carrier == float.class || carrier == double.class) {
+            return FLOAT;
         } else if (carrier == MemoryAddress.class) {
             return POINTER;
         } else {
-            throw new IllegalArgumentException("Unhandled type " + type);
+            throw new IllegalStateException("Cannot get here: " + carrier.getName());
         }
     }
 
@@ -205,7 +194,6 @@ public enum TypeClass {
         else return STRUCT_A;
     }
 
-    // Classify argument pass style.
     static TypeClass classifyLayout(MemoryLayout type) {
         if (type instanceof ValueLayout vt) {
             return classifyValueType(vt);
