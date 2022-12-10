@@ -32,7 +32,7 @@ public enum CABI {
     SYS_V,
     WIN_64,
     LINUX_AARCH_64,
-    MAC_OS_AARCH_64;
+    MAC_OS_AARCH_64,
     LINUX_RISCV_64;
 
     private static final CABI ABI;
