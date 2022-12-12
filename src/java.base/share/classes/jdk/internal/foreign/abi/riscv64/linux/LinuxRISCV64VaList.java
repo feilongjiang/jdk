@@ -228,7 +228,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
                 MemoryLayout layout = arg.layout;
                 // arguments with 2xXLEN-bit alignment and size at most 2xXLEN bits
                 // are saved on memory aligned with 2xXLEN, for RISV64, XLEN=64.
-                if (layout.bitSize() <= 128 && layout.bitAlignment() == 128) {
+                if (layout.byteSize() <= 16 && layout.byteAlignment() == 16) {
                     stackArgsSize = Utils.alignUp(stackArgsSize, 16);
                 }
                 long elementSize = TypeClass.classifyLayout(layout) == TypeClass.STRUCT_REFERENCE ?
@@ -245,7 +245,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
                 } else {
                     layout = arg.layout;
                 }
-                if (layout.bitSize() <= 128  && layout.bitAlignment() == 128) {
+                if (layout.byteSize() <= 16 && layout.byteAlignment() == 16) {
                     writeCursor = Utils.alignUp(writeCursor, 16);
                 }
                 if (layout instanceof GroupLayout) {
