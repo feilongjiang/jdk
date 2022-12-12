@@ -34,7 +34,6 @@ import java.lang.invoke.MethodType;
 import java.util.function.Consumer;
 
 public final class LinuxRISCV64Linker extends AbstractLinker {
-    static LinuxRISCV64Linker instance = null;
 
     public static LinuxRISCV64Linker getInstance() {
         final class Holder {

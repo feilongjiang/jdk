@@ -95,8 +95,8 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
 
         checkArgumentBindings(callingSequence, new Binding[][]{
             { unboxAddress(), vmStore(x29, long.class) },
-            { vmStore(x10, byte.class) },
-            { vmStore(x11, short.class) },
+            { cast(byte.class, int.class), vmStore(x10, int.class) },
+            { cast(short.class, int.class), vmStore(x11, int.class) },
             { vmStore(x12, int.class) },
             { vmStore(x13, int.class) },
             { vmStore(x14, int.class) },
@@ -104,7 +104,7 @@ public class TestRISCV64CallArranger extends CallArrangerTestBase {
             { vmStore(x16, long.class) },
             { vmStore(x17, int.class) },
             { vmStore(stackStorage(0), int.class) },
-            { vmStore(stackStorage(1), byte.class) }
+            { cast(byte.class, int.class), vmStore(stackStorage(1), int.class) }
         });
 
         checkReturnBindings(callingSequence, new Binding[]{});

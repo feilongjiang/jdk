@@ -93,10 +93,10 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
     private Object read(MemoryLayout layout, SegmentAllocator allocator) {
         Objects.requireNonNull(layout);
         TypeClass typeClass = TypeClass.classifyLayout(layout);
-        checkStackElement(layout);
         preAlignStack();
         return switch (typeClass) {
             case INTEGER, FLOAT, POINTER -> {
+                checkStackElement(layout);
                 VarHandle reader = layout.varHandle();
                 MemorySegment slice = segment.asSlice(offset, layout.byteSize());
                 Object res = reader.get(slice);
@@ -104,6 +104,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
                 yield res;
             }
             case STRUCT_A, STRUCT_FA, STRUCT_BOTH -> {
+                checkStackElement(layout);
                 // Struct is passed indirectly via a pointer in an integer register.
                 MemorySegment slice = segment.asSlice(offset, layout.byteSize());
                 MemorySegment seg = allocator.allocate(layout);
@@ -112,6 +113,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
                 yield seg;
             }
             case STRUCT_REFERENCE -> {
+                checkStackElement(ADDRESS);
                 VarHandle addrReader = ADDRESS.varHandle();
                 MemorySegment slice = segment.asSlice(offset, ADDRESS.byteSize());
                 MemorySegment addr = (MemorySegment) addrReader.get(slice);
@@ -221,26 +223,31 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
 
         public VaList build() {
             if (isEmpty()) return EMPTY;
-            long stackArgsSize = stackArgs.stream()
-                                          .reduce(0L, (acc, e) -> {
-                                              long elementSize = TypeClass.classifyLayout(e.layout) == TypeClass.STRUCT_REFERENCE ?
-                                                      ADDRESS.byteSize() : e.layout.byteSize();
-                                              return acc + Utils.alignUp(elementSize, STACK_SLOT_SIZE);
-                                          }, Long::sum);
+            long stackArgsSize = 0;
+            for (SimpleVaArg arg : stackArgs) {
+                MemoryLayout layout = arg.layout;
+                // arguments with 2xXLEN-bit alignment and size at most 2xXLEN bits
+                // are saved on memory aligned with 2xXLEN, for RISV64, XLEN=64.
+                if (layout.bitSize() <= 128 && layout.bitAlignment() == 128) {
+                    stackArgsSize = Utils.alignUp(stackArgsSize, 16);
+                }
+                long elementSize = TypeClass.classifyLayout(layout) == TypeClass.STRUCT_REFERENCE ?
+                    ADDRESS.byteSize() : layout.byteSize();
+                stackArgsSize += Utils.alignUp(elementSize, STACK_SLOT_SIZE);
+            }
             MemorySegment argsSegment = MemorySegment.allocateNative(stackArgsSize, 16, session);
             MemorySegment writeCursor = argsSegment;
             for (SimpleVaArg arg : stackArgs) {
                 MemoryLayout layout;
-                Object value;
+                Object value = arg.value;
                 if (TypeClass.classifyLayout(arg.layout) == TypeClass.STRUCT_REFERENCE) {
                     layout = ADDRESS;
-                    value = ((MemorySegment) arg.value).address();
                 } else {
                     layout = arg.layout;
-                    value = arg.value;
                 }
-                int alignUp = layout.byteSize() > 8 ? 16 : 8;
-                writeCursor = Utils.alignUp(writeCursor, alignUp);
+                if (layout.bitSize() <= 128  && layout.bitAlignment() == 128) {
+                    writeCursor = Utils.alignUp(writeCursor, 16);
+                }
                 if (layout instanceof GroupLayout) {
                     writeCursor.copyFrom((MemorySegment) value);
                 } else {
