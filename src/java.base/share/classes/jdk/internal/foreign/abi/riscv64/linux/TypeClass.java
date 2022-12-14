@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2022, Institute of Software, Chinese Academy of Sciences. All rights reserved.
+ * Copyright (c) 2023, Institute of Software, Chinese Academy of Sciences.
+ * All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,43 +26,49 @@
 
 package jdk.internal.foreign.abi.riscv64.linux;
 
-import java.lang.foreign.*;
+import java.lang.foreign.GroupLayout;
+import java.lang.foreign.MemoryLayout;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.PaddingLayout;
+import java.lang.foreign.SequenceLayout;
+import java.lang.foreign.UnionLayout;
+import java.lang.foreign.ValueLayout;
 import java.util.ArrayList;
 import java.util.List;
 
 public enum TypeClass {
     /*
-     * STRUCT_REFERENCE: Struct and its width > 16B, it will be replaced by its reference.
-     *     The reference shall be passed by integer register when a register is available,
-     *     otherwise the reference will be passed by stack.
+     * STRUCT_REFERENCE: Struct larger than 16B are passed by reference and are replaced
+     *     in the argument list with the address. The address will be passed by integer
+     *     register if a register is available, otherwise it will be passed by stack.
      *
-     * STRUCT_FA: Struct contains one or two floating-point fields and its width <= 16B.
-     *     Should be passed by one or two float-pointing argument registers, if registers available,
-     *     otherwise be passed by stack.
+     * STRUCT_REGISTER_F: Struct contains only one or two floating-point fields and its size <= 16B.
+     *     The struct will be passed by one or two float-pointing argument registers if
+     *     registers are available, otherwise it will be passed by stack.
      *
-     * STRUCT_BOTH: Struct contains both an integer field and a floating-point field
-     *     and its width <= 16B, shall be passed by both a floating-point argument register
-     *     and an integer argument register where both a float register and an integer is available.
+     * STRUCT_REGISTER_XF: Struct contains both an integer field and a floating-point field
+     *     and its size <= 16B. The struct will be passed by both a floating-point
+     *     argument register and an integer argument register where both a float register
+     *     and an integer are available, otherwise it will be passed by stack.
      *
-     * STRUCT_A: Struct and its width <= 16B.
-     *     Should be passed by one or two integer argument register if registers are available,
-     *     otherwise it will be passed by stack.
+     * STRUCT_REGISTER_X: Struct and its size <= 16B. The struct will be passed by one or two integer
+     *     argument register if registers are available, otherwise it will be passed by stack.
      *
-     * See https://github.com/riscv-non-isa/riscv-elf-psabi-doc
+     * See https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-cc.adoc
      * */
     INTEGER,
     FLOAT,
     POINTER,
-    STRUCT_A,
-    STRUCT_FA,
-    STRUCT_BOTH,
-    STRUCT_REFERENCE;
+    STRUCT_REFERENCE,
+    STRUCT_REGISTER_F,
+    STRUCT_REGISTER_XF,
+    STRUCT_REGISTER_X;
+
+    private static final int MAX_AGGREGATE_REGS_SIZE = 2;
 
     /*
-     * Struct will be flattened while classifying and therefore should count its fields recursively.
-     *
-     * struct{struct{int, double}} will be treated same as struct{int, double}
-     * struct{int[2]} will be treated same as struct{int, int}
+     * Struct will be flattened while classifying. That is, struct{struct{int, double}} will be treated
+     * same as struct{int, double} and struct{int[2]} will be treated same as struct{int, int}.
      * */
     private static record FieldCounter(long integerCnt, long floatCnt, long pointerCnt) {
         static final FieldCounter EMPTY = new FieldCounter(0, 0, 0);
@@ -75,21 +82,22 @@ public enum TypeClass {
                     case INTEGER -> FieldCounter.SINGLE_INTEGER;
                     case FLOAT -> FieldCounter.SINGLE_FLOAT;
                     case POINTER -> FieldCounter.SINGLE_POINTER;
-                    default -> {
-                        assert false : "should not reach here.";
-                        yield null; /* should not reach here. */
-                    }
+                    default -> throw new IllegalStateException("Should not reach here.");
                 };
             } else if (layout instanceof GroupLayout groupLayout) {
                 FieldCounter currCounter = FieldCounter.EMPTY;
                 for (MemoryLayout memberLayout : groupLayout.memberLayouts()) {
-                    if (memberLayout instanceof PaddingLayout) continue;
+                    if (memberLayout instanceof PaddingLayout) {
+                        continue;
+                    }
                     currCounter = currCounter.add(flatten(memberLayout));
                 }
                 return currCounter;
             } else if (layout instanceof SequenceLayout sequenceLayout) {
                 long elementCount = sequenceLayout.elementCount();
-                if (elementCount == 0) return FieldCounter.EMPTY;
+                if (elementCount == 0) {
+                    return FieldCounter.EMPTY;
+                }
                 return flatten(sequenceLayout.elementLayout()).mul(elementCount);
             } else {
                 throw new IllegalStateException("Cannot get here: " + layout);
@@ -108,12 +116,11 @@ public enum TypeClass {
                                     pointerCnt + other.pointerCnt);
         }
 
-        boolean isSTRUCT_FA() {
-            return integerCnt == 0 && pointerCnt == 0 &&
-                    (floatCnt == 1 || floatCnt == 2);
+        boolean isSTRUCT_REGISTER_F() {
+            return integerCnt == 0 && pointerCnt == 0 && (floatCnt == 1 || floatCnt == 2);
         }
 
-        boolean isSTRUCT_BOTH() {
+        boolean isSTRUCT_REGISTER_XF() {
             return integerCnt == 1 && floatCnt == 1 && pointerCnt == 0;
         }
     }
@@ -126,12 +133,8 @@ public enum TypeClass {
         if (layout instanceof ValueLayout valueLayout) {
             TypeClass typeClass = classifyValueType(valueLayout);
             return List.of(switch (typeClass) {
-                case INTEGER, FLOAT ->
-                        new FlattenedFieldDesc(typeClass, offset, valueLayout);
-                default -> {
-                    assert false : "should not reach here.";
-                    yield null; /* should not reach here. */
-                }
+                case INTEGER, FLOAT -> new FlattenedFieldDesc(typeClass, offset, valueLayout);
+                default -> throw new IllegalStateException("Should not reach here.");
             });
         } else if (layout instanceof GroupLayout groupLayout) {
             List<FlattenedFieldDesc> fields = new ArrayList<>();
@@ -177,21 +180,27 @@ public enum TypeClass {
     }
 
     private static boolean isRegisterAggregate(MemoryLayout type) {
-        return type.byteSize() <= 16L;
+        return type.bitSize() <= MAX_AGGREGATE_REGS_SIZE * 64;
     }
 
     private static TypeClass classifyStructType(GroupLayout layout) {
         if (layout instanceof UnionLayout) {
-            return isRegisterAggregate(layout) ? STRUCT_A : STRUCT_REFERENCE;
+            return isRegisterAggregate(layout) ? STRUCT_REGISTER_X : STRUCT_REFERENCE;
+        }
+
+        if (!isRegisterAggregate(layout)) {
+            return STRUCT_REFERENCE;
         }
 
         // classify struct by its fields.
         FieldCounter counter = FieldCounter.flatten(layout);
-
-        if (!isRegisterAggregate(layout)) return STRUCT_REFERENCE;
-        else if (counter.isSTRUCT_FA()) return STRUCT_FA;
-        else if (counter.isSTRUCT_BOTH()) return STRUCT_BOTH;
-        else return STRUCT_A;
+        if (counter.isSTRUCT_REGISTER_F()) {
+            return STRUCT_REGISTER_F;
+        } else if (counter.isSTRUCT_REGISTER_XF()) {
+            return STRUCT_REGISTER_XF;
+        } else {
+            return STRUCT_REGISTER_X;
+        }
     }
 
     static TypeClass classifyLayout(MemoryLayout type) {

@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2022, Institute of Software, Chinese Academy of Sciences. All rights reserved.
+ * Copyright (c) 2023, Institute of Software, Chinese Academy of Sciences.
+ * All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,11 +26,17 @@
 
 package jdk.internal.foreign.abi.riscv64.linux;
 
+import java.lang.foreign.GroupLayout;
+import java.lang.foreign.MemoryLayout;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SegmentScope;
+import java.lang.foreign.SegmentAllocator;
+import java.lang.foreign.ValueLayout;
+import java.lang.foreign.VaList;
 import jdk.internal.foreign.abi.SharedUtils;
 import jdk.internal.foreign.MemorySessionImpl;
 import jdk.internal.foreign.Utils;
 
-import java.lang.foreign.*;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.List;
@@ -93,7 +100,8 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
     private Object read(MemoryLayout layout, SegmentAllocator allocator) {
         Objects.requireNonNull(layout);
         TypeClass typeClass = TypeClass.classifyLayout(layout);
-        preAlignStack();
+        preAlignStack(layout);
+
         return switch (typeClass) {
             case INTEGER, FLOAT, POINTER -> {
                 checkStackElement(layout);
@@ -103,7 +111,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
                 postAlignStack(layout);
                 yield res;
             }
-            case STRUCT_A, STRUCT_FA, STRUCT_BOTH -> {
+            case STRUCT_REGISTER_X, STRUCT_REGISTER_F, STRUCT_REGISTER_XF -> {
                 checkStackElement(layout);
                 // Struct is passed indirectly via a pointer in an integer register.
                 MemorySegment slice = segment.asSlice(offset, layout.byteSize());
@@ -117,9 +125,9 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
                 VarHandle addrReader = ADDRESS.varHandle();
                 MemorySegment slice = segment.asSlice(offset, ADDRESS.byteSize());
                 MemorySegment addr = (MemorySegment) addrReader.get(slice);
-                postAlignStack(ADDRESS);
                 MemorySegment seg = allocator.allocate(layout);
                 seg.copyFrom(MemorySegment.ofAddress(addr.address(), layout.byteSize(), segment.scope()));
+                postAlignStack(ADDRESS);
                 yield seg;
             }
         };
@@ -131,12 +139,20 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
         }
     }
 
-    private void preAlignStack() {
-        offset = Utils.alignUp(offset, STACK_SLOT_SIZE);
+    private void preAlignStack(MemoryLayout layout) {
+        if (layout.byteSize() <= 16 && layout.byteAlignment() == 16) {
+            offset = Utils.alignUp(offset, 16);
+        } else {
+            offset = Utils.alignUp(offset, STACK_SLOT_SIZE);
+        }
     }
 
     private void postAlignStack(MemoryLayout layout) {
-        offset += Utils.alignUp(layout.byteSize(), STACK_SLOT_SIZE);
+        if (layout.byteSize() <= 16 && layout.byteAlignment() == 16) {
+            offset += 16;
+        } else {
+            offset += Utils.alignUp(layout.byteSize(), STACK_SLOT_SIZE);
+        }
     }
 
     @Override
@@ -145,12 +161,8 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
         ((MemorySessionImpl) segment.scope()).checkValidState();
         for (MemoryLayout layout : layouts) {
             Objects.requireNonNull(layout);
-            TypeClass typeClass = TypeClass.classifyLayout(layout);
-            switch (typeClass) {
-                case INTEGER, FLOAT, POINTER, STRUCT_REFERENCE ->
-                        offset += 8;
-                case STRUCT_A, STRUCT_FA, STRUCT_BOTH -> offset += Utils.alignUp(layout.byteSize(), STACK_SLOT_SIZE);
-            }
+            preAlignStack(layout);
+            postAlignStack(layout);
         }
     }
 
@@ -178,11 +190,11 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
 
     public static non-sealed class Builder implements VaList.Builder {
 
-        private final SegmentScope session;
+        private final SegmentScope scope;
         private final List<SimpleVaArg> stackArgs = new ArrayList<>();
 
-        Builder(SegmentScope session) {
-            this.session = session;
+        Builder(SegmentScope scope) {
+            this.scope = scope;
         }
 
         @Override
@@ -222,20 +234,23 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
         }
 
         public VaList build() {
-            if (isEmpty()) return EMPTY;
+            if (isEmpty()) {
+                return EMPTY;
+            }
             long stackArgsSize = 0;
             for (SimpleVaArg arg : stackArgs) {
                 MemoryLayout layout = arg.layout;
+                long elementSize = TypeClass.classifyLayout(layout) == TypeClass.STRUCT_REFERENCE ?
+                    ADDRESS.byteSize() : layout.byteSize();
                 // arguments with 2 * XLEN-bit alignment and size at most 2 * XLEN bits
                 // are saved on memory aligned with 2 * XLEN (XLEN=64 for RISCV64).
                 if (layout.byteSize() <= 16 && layout.byteAlignment() == 16) {
                     stackArgsSize = Utils.alignUp(stackArgsSize, 16);
+                    elementSize = 16;
                 }
-                long elementSize = TypeClass.classifyLayout(layout) == TypeClass.STRUCT_REFERENCE ?
-                    ADDRESS.byteSize() : layout.byteSize();
                 stackArgsSize += Utils.alignUp(elementSize, STACK_SLOT_SIZE);
             }
-            MemorySegment argsSegment = MemorySegment.allocateNative(stackArgsSize, 16, session);
+            MemorySegment argsSegment = MemorySegment.allocateNative(stackArgsSize, 16, scope);
             MemorySegment writeCursor = argsSegment;
             for (SimpleVaArg arg : stackArgs) {
                 MemoryLayout layout;
@@ -245,8 +260,10 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
                 } else {
                     layout = arg.layout;
                 }
+                long alignedSize = Utils.alignUp(layout.byteSize(), STACK_SLOT_SIZE);
                 if (layout.byteSize() <= 16 && layout.byteAlignment() == 16) {
                     writeCursor = Utils.alignUp(writeCursor, 16);
+                    alignedSize = 16;
                 }
                 if (layout instanceof GroupLayout) {
                     writeCursor.copyFrom((MemorySegment) value);
@@ -254,12 +271,9 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
                     VarHandle writer = layout.varHandle();
                     writer.set(writeCursor, value);
                 }
-                long alignedSize = Utils.alignUp(layout.byteSize(), STACK_SLOT_SIZE);
                 writeCursor = writeCursor.asSlice(alignedSize);
             }
             return new LinuxRISCV64VaList(argsSegment, 0L);
         }
-
     }
-
 }
