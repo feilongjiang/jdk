@@ -37,6 +37,7 @@ import java.util.Optional;
 
 import static jdk.internal.foreign.abi.riscv64.linux.TypeClass.*;
 import static jdk.internal.foreign.abi.riscv64.RISCV64Architecture.*;
+import static jdk.internal.foreign.abi.riscv64.RISCV64Architecture.Regs.*;
 import static jdk.internal.foreign.PlatformLayouts.*;
 
 /**
@@ -56,9 +57,8 @@ public class LinuxRISCV64CallArranger {
             new VMStorage[]{x5, x6, x7, x28, x29, x30, x31},
             new VMStorage[]{f0, f1, f2, f3, f4, f5, f6, f7, f28, f29, f30, f31},
             16, // stackAlignment
-            0, // no shadow space
-            x29, // target addr reg
-            x30  // ret buf addr reg
+            0,  // no shadow space
+            x29, x30  // scratch 1 & 2
     );
 
     public record Bindings(CallingSequence callingSequence,
@@ -70,7 +70,7 @@ public class LinuxRISCV64CallArranger {
     }
 
     public static Bindings getBindings(MethodType mt, FunctionDescriptor cDesc, boolean forUpcall, LinkerOptions options) {
-        CallingSequenceBuilder csb = new CallingSequenceBuilder(CLinux, forUpcall);
+        CallingSequenceBuilder csb = new CallingSequenceBuilder(CLinux, forUpcall, options);
         BindingCalculator argCalc = forUpcall ? new BoxBindingCalculator(true) : new UnboxBindingCalculator(true);
         BindingCalculator retCalc = forUpcall ? new UnboxBindingCalculator(false) : new BoxBindingCalculator(false);
 
@@ -102,13 +102,13 @@ public class LinuxRISCV64CallArranger {
         MethodHandle handle = new DowncallLinker(CLinux, bindings.callingSequence).getBoundMethodHandle();
 
         if (bindings.isInMemoryReturn) {
-            handle = SharedUtils.adaptDowncallForIMR(handle, cDesc);
+            handle = SharedUtils.adaptDowncallForIMR(handle, cDesc, bindings.callingSequence);
         }
 
         return handle;
     }
 
-    public static MemorySegment arrangeUpcall(MethodHandle target, MethodType mt, FunctionDescriptor cDesc, SegmentScope session) {
+    public static MemorySegment arrangeUpcall(MethodHandle target, MethodType mt, FunctionDescriptor cDesc, SegmentScope scope) {
 
         Bindings bindings = getBindings(mt, cDesc, true);
 
@@ -116,7 +116,7 @@ public class LinuxRISCV64CallArranger {
             target = SharedUtils.adaptUpcallForIMR(target, true /* drop return, since we don't have bindings for it */);
         }
 
-        return UpcallLinker.make(CLinux, target, bindings.callingSequence, session);
+        return UpcallLinker.make(CLinux, target, bindings.callingSequence, scope);
     }
 
     private static boolean isInMemoryReturn(Optional<MemoryLayout> returnLayout) {
@@ -141,7 +141,7 @@ public class LinuxRISCV64CallArranger {
 
         VMStorage stackAlloc() {
             assert forArguments : "no stack returns";
-            VMStorage storage = stackStorage((int) (stackOffset / STACK_SLOT_SIZE));
+            VMStorage storage = stackStorage((short) STACK_SLOT_SIZE, (int) stackOffset);
             stackOffset += STACK_SLOT_SIZE;
             return storage;
         }
@@ -163,10 +163,10 @@ public class LinuxRISCV64CallArranger {
         VMStorage getStorage(int storageClass) {
             Optional<VMStorage> storage = regAlloc(storageClass);
             if (storage.isPresent()) return storage.get();
-            // If storageClass is StorageClasses.FLOAT, and no floating-point register is available,
+            // If storageClass is StorageType.FLOAT, and no floating-point register is available,
             // try to allocate an integer register.
-            if (storageClass == StorageClasses.FLOAT) {
-                storage = regAlloc(StorageClasses.toIntegerClass(storageClass));
+            if (storageClass == StorageType.FLOAT) {
+                storage = regAlloc(StorageType.toIntegerClass(storageClass));
                 if (storage.isPresent()) return storage.get();
             }
             return stackAlloc();
@@ -177,7 +177,7 @@ public class LinuxRISCV64CallArranger {
             VMStorage[] storages = new VMStorage[regCnt];
             for (int i = 0; i < regCnt; i++) {
                 // use integer calling convention.
-                storages[i] = getStorage(StorageClasses.INTEGER);
+                storages[i] = getStorage(StorageType.INTEGER);
             }
             return storages;
         }
@@ -237,13 +237,13 @@ public class LinuxRISCV64CallArranger {
             Binding.Builder bindings = Binding.builder();
             switch (argumentClass) {
                 case INTEGER, FLOAT -> {
-                    VMStorage storage = storageCalculator.getStorage(StorageClasses.fromTypeClass(argumentClass));
+                    VMStorage storage = storageCalculator.getStorage(StorageType.fromTypeClass(argumentClass));
                     bindings.vmStore(storage, carrier);
                 }
 
                 case POINTER -> {
                     bindings.unboxAddress();
-                    VMStorage storage = storageCalculator.getStorage(StorageClasses.INTEGER);
+                    VMStorage storage = storageCalculator.getStorage(StorageType.INTEGER);
                     bindings.vmStore(storage, long.class);
                 }
 
@@ -256,7 +256,7 @@ public class LinuxRISCV64CallArranger {
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = storage.type() == StorageClasses.FLOAT;
+                        boolean useFloat = storage.type() == StorageType.FLOAT;
                         Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
                         if (offset + copy < layout.byteSize()) {
                             bindings.dup();
@@ -275,7 +275,7 @@ public class LinuxRISCV64CallArranger {
                             FlattenedFieldDesc desc = descs.get(i);
                             Class<?> type = desc.layout().carrier();
                             VMStorage storage = storageCalculator.getStorage(
-                                    StorageClasses.fromTypeClass(desc.typeClass()));
+                                    StorageType.fromTypeClass(desc.typeClass()));
                             if (i < descs.size() - 1) bindings.dup();
                             bindings.bufferLoad(desc.offset(), type)
                                     .vmStore(storage, type);
@@ -291,7 +291,7 @@ public class LinuxRISCV64CallArranger {
                     if (storageCalculator.availableRegs(1, 1)) {
                         List<FlattenedFieldDesc> descs = getFlattenedFields((GroupLayout) layout);
                         for (int i = 0; i < 2; i++) {
-                            int storageClass = StorageClasses.fromTypeClass(descs.get(i).typeClass());
+                            int storageClass = StorageType.fromTypeClass(descs.get(i).typeClass());
                             FlattenedFieldDesc desc = descs.get(i);
                             VMStorage storage = storageCalculator.getStorage(storageClass);
                             Class<?> type = desc.layout().carrier();
@@ -309,7 +309,7 @@ public class LinuxRISCV64CallArranger {
                     bindings.copy(layout)
                             .unboxAddress();
                     VMStorage storage = storageCalculator.getStorage(
-                            StorageClasses.INTEGER);
+                            StorageType.INTEGER);
                     bindings.vmStore(storage, long.class);
                 }
 
@@ -338,12 +338,12 @@ public class LinuxRISCV64CallArranger {
             Binding.Builder bindings = Binding.builder();
             switch (argumentClass) {
                 case INTEGER, FLOAT -> {
-                    VMStorage storage = storageCalculator.getStorage(StorageClasses.fromTypeClass(argumentClass));
+                    VMStorage storage = storageCalculator.getStorage(StorageType.fromTypeClass(argumentClass));
                     bindings.vmLoad(storage, carrier);
                 }
 
                 case POINTER -> {
-                    VMStorage storage = storageCalculator.getStorage(StorageClasses.INTEGER);
+                    VMStorage storage = storageCalculator.getStorage(StorageType.INTEGER);
                     bindings.vmLoad(storage, long.class)
                             .boxAddressRaw(Utils.pointeeSize(layout));
                 }
@@ -358,7 +358,7 @@ public class LinuxRISCV64CallArranger {
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = storage.type() == StorageClasses.FLOAT;
+                        boolean useFloat = storage.type() == StorageType.FLOAT;
                         Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
                         bindings.dup().vmLoad(storage, type)
                                 .bufferStore(offset, type);
@@ -374,7 +374,7 @@ public class LinuxRISCV64CallArranger {
                         for (FlattenedFieldDesc desc : descs) {
                             Class<?> type = desc.layout().carrier();
                             VMStorage storage = storageCalculator.getStorage(
-                                    StorageClasses.fromTypeClass(desc.typeClass()));
+                                    StorageType.fromTypeClass(desc.typeClass()));
                             bindings.dup()
                                     .vmLoad(storage, type)
                                     .bufferStore(desc.offset(), type);
@@ -391,7 +391,7 @@ public class LinuxRISCV64CallArranger {
                         List<FlattenedFieldDesc> descs = getFlattenedFields((GroupLayout) layout);
                         for (int i = 0; i < 2; i++) {
                             FlattenedFieldDesc desc = descs.get(i);
-                            int storageClass = StorageClasses.fromTypeClass(desc.typeClass());
+                            int storageClass = StorageType.fromTypeClass(desc.typeClass());
                             VMStorage storage = storageCalculator.getStorage(storageClass);
                             Class<?> type = desc.layout().carrier();
                             bindings.dup()
@@ -406,7 +406,7 @@ public class LinuxRISCV64CallArranger {
                 case STRUCT_REFERENCE -> {
                     assert carrier == MemorySegment.class;
                     VMStorage storage = storageCalculator.getStorage(
-                            StorageClasses.INTEGER);
+                            StorageType.INTEGER);
                     bindings.vmLoad(storage, long.class)
                             .boxAddress(layout);
                 }

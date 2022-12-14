@@ -63,8 +63,8 @@ public final class LinuxRISCV64Linker extends AbstractLinker {
         return builder.build();
     }
 
-    public static VaList newVaListOfAddress(long address, SegmentScope session) {
-        MemorySegment segment = MemorySegment.ofAddress(address, Long.MAX_VALUE, session); // size unknown
+    public static VaList newVaListOfAddress(long address, SegmentScope scope) {
+        MemorySegment segment = MemorySegment.ofAddress(address, Long.MAX_VALUE, scope); // size unknown
         return new LinuxRISCV64VaList(segment, 0);
     }
 

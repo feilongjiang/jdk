@@ -178,11 +178,11 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
 
     public static non-sealed class Builder implements VaList.Builder {
 
-        private final SegmentScope session;
+        private final SegmentScope scope;
         private final List<SimpleVaArg> stackArgs = new ArrayList<>();
 
-        Builder(SegmentScope session) {
-            this.session = session;
+        Builder(SegmentScope scope) {
+            this.scope = scope;
         }
 
         @Override
@@ -235,7 +235,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
                     ADDRESS.byteSize() : layout.byteSize();
                 stackArgsSize += Utils.alignUp(elementSize, STACK_SLOT_SIZE);
             }
-            MemorySegment argsSegment = MemorySegment.allocateNative(stackArgsSize, 16, session);
+            MemorySegment argsSegment = MemorySegment.allocateNative(stackArgsSize, 16, scope);
             MemorySegment writeCursor = argsSegment;
             for (SimpleVaArg arg : stackArgs) {
                 MemoryLayout layout;
