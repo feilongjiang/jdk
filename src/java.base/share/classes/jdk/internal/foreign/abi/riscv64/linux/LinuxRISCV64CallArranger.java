@@ -187,6 +187,19 @@ public class LinuxRISCV64CallArranger {
                    nRegs[FloatRegIdx] + floatReg <= MAX_REGISTER_ARGUMENTS;
         }
 
+        // Variadic arguments with 2×XLEN-bit alignment and size at most 2×XLEN bits are passed
+        // in an aligned register pair (i.e., the first register in the pair is even-numbered),
+        // or on the stack by value if none is available.
+        // After a variadic argument has been passed on the stack,
+        // all future arguments will also be passed on the stack
+        void alignStorage() {
+            if (nRegs[IntegerRegIdx] + 2 <= MAX_REGISTER_ARGUMENTS) {
+                nRegs[IntegerRegIdx] = (nRegs[IntegerRegIdx] + 1) & -2;
+            } else {
+                stackOffset = Utils.alignUp(stackOffset, 16);
+            }
+        }
+
         @Override
         public String toString() {
             String nReg = "iReg: " + nRegs[IntegerRegIdx] + ", fReg: " + nRegs[FloatRegIdx];
@@ -230,11 +243,14 @@ public class LinuxRISCV64CallArranger {
             if (isVariadicArg) {
                 typeClass = BindingCalculator.conventionConverterMap.getOrDefault(typeClass, typeClass);
             }
-            return getBindings(carrier, layout, typeClass);
+            return getBindings(carrier, layout, typeClass, isVariadicArg);
         }
 
-        List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, TypeClass argumentClass) {
+        List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, TypeClass argumentClass, boolean isVariadicArg) {
             Binding.Builder bindings = Binding.builder();
+            if (isVariadicArg && layout.byteSize() <= 16 && layout.byteAlignment() == 16) {
+                storageCalculator.alignStorage();
+            }
             switch (argumentClass) {
                 case INTEGER, FLOAT -> {
                     VMStorage storage = storageCalculator.getStorage(StorageType.fromTypeClass(argumentClass));
@@ -282,7 +298,7 @@ public class LinuxRISCV64CallArranger {
                         }
                     } else {
                         // If there is not enough register can be used, then fall back to integer calling convention.
-                        return getBindings(carrier, layout, STRUCT_A);
+                        return getBindings(carrier, layout, STRUCT_A, isVariadicArg);
                     }
                 }
 
@@ -300,7 +316,7 @@ public class LinuxRISCV64CallArranger {
                                     .vmStore(storage, type);
                         }
                     } else {
-                        return getBindings(carrier, layout, STRUCT_A);
+                        return getBindings(carrier, layout, STRUCT_A, isVariadicArg);
                     }
                 }
 
@@ -331,11 +347,14 @@ public class LinuxRISCV64CallArranger {
             if (isVariadicArg) {
                 typeClass = BindingCalculator.conventionConverterMap.getOrDefault(typeClass, typeClass);
             }
-            return getBindings(carrier, layout, typeClass);
+            return getBindings(carrier, layout, typeClass, isVariadicArg);
         }
 
-        List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, TypeClass argumentClass) {
+        List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, TypeClass argumentClass, boolean isVariadicArg) {
             Binding.Builder bindings = Binding.builder();
+            if (isVariadicArg && layout.byteSize() <= 16 && layout.byteAlignment() == 16) {
+                storageCalculator.alignStorage();
+            }
             switch (argumentClass) {
                 case INTEGER, FLOAT -> {
                     VMStorage storage = storageCalculator.getStorage(StorageType.fromTypeClass(argumentClass));
@@ -380,7 +399,7 @@ public class LinuxRISCV64CallArranger {
                                     .bufferStore(desc.offset(), type);
                         }
                     } else {
-                        return getBindings(carrier, layout, STRUCT_A);
+                        return getBindings(carrier, layout, STRUCT_A, isVariadicArg);
                     }
                 }
 
@@ -399,7 +418,7 @@ public class LinuxRISCV64CallArranger {
                                     .bufferStore(desc.offset(), type);
                         }
                     } else {
-                        return getBindings(carrier, layout, STRUCT_A);
+                        return getBindings(carrier, layout, STRUCT_A, isVariadicArg);
                     }
                 }
 
