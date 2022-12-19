@@ -190,12 +190,13 @@ public class LinuxRISCV64CallArranger {
         // Variadic arguments with 2×XLEN-bit alignment and size at most 2×XLEN bits are passed
         // in an aligned register pair (i.e., the first register in the pair is even-numbered),
         // or on the stack by value if none is available.
-        // After a variadic argument has been passed on the stack,
-        // all future arguments will also be passed on the stack
+        // After a variadic argument has been passed on the stack, all future arguments will
+        // also be passed on the stack.
         void alignStorage() {
             if (nRegs[IntegerRegIdx] + 2 <= MAX_REGISTER_ARGUMENTS) {
                 nRegs[IntegerRegIdx] = (nRegs[IntegerRegIdx] + 1) & -2;
             } else {
+                nRegs[IntegerRegIdx] = MAX_REGISTER_ARGUMENTS;
                 stackOffset = Utils.alignUp(stackOffset, 16);
             }
         }
