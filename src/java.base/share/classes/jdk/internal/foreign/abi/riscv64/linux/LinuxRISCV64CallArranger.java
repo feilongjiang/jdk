@@ -187,7 +187,7 @@ public class LinuxRISCV64CallArranger {
                    nRegs[FloatRegIdx] + floatReg <= MAX_REGISTER_ARGUMENTS;
         }
 
-        // Variadic arguments with 2xXLEN-bit alignment and size at most 2xXLEN bits are passed
+        // Variadic arguments with 2*XLEN-bit alignment and size at most 2*XLEN bits are passed
         // in an aligned register pair (i.e., the first register in the pair is even-numbered),
         // or on the stack by value if none is available.
         // After a variadic argument has been passed on the stack, all future arguments will
