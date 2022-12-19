@@ -26,11 +26,10 @@
 #include "precompiled.hpp"
 #include "asm/macroAssembler.hpp"
 #include "code/codeBlob.hpp"
+#include "compiler/oopMap.hpp"
 #include "logging/logStream.hpp"
 #include "memory/resourceArea.hpp"
 #include "prims/downcallLinker.hpp"
-#include "prims/foreignGlobals.inline.hpp"
-#include "runtime/sharedRuntime.hpp"
 #include "runtime/stubCodeGenerator.hpp"
 
 #define __ _masm->
@@ -42,7 +41,6 @@ class DowncallStubGenerator : public StubCodeGenerator {
 
     const ABIDescriptor& _abi;
     const GrowableArray<VMStorage>& _input_registers;
-    // output_registers is which carry return value from native function.
     const GrowableArray<VMStorage>& _output_registers;
 
     bool _needs_return_buffer;
@@ -102,7 +100,8 @@ RuntimeStub* DowncallLinker::make_downcall_stub(BasicType* signature,
                                                 int captured_state_mask) {
   int locs_size = 64;
   CodeBuffer code("nep_invoker_blob", native_invoker_code_size, locs_size);
-  DowncallStubGenerator g(&code, signature, num_args, ret_bt, abi, input_registers, output_registers,
+  DowncallStubGenerator g(&code, signature, num_args, ret_bt, abi,
+                          input_registers, output_registers,
                           needs_return_buffer, captured_state_mask);
   g.generate();
   code.log_section_sizes("nep_invoker_blob");
@@ -141,10 +140,10 @@ void DowncallStubGenerator::generate() {
       // out arg area (e.g. for stack args)
   };
 
-  VMStorage shufffle_reg = as_VMStorage(t2);
+  VMStorage shuffle_reg = as_VMStorage(x9);
   JavaCallingConvention in_conv;
   NativeCallingConvention out_conv(_input_registers);
-  ArgumentShuffle arg_shuffle(_signature, _num_args, _signature, _num_args, &in_conv, &out_conv, shufffle_reg);
+  ArgumentShuffle arg_shuffle(_signature, _num_args, _signature, _num_args, &in_conv, &out_conv, shuffle_reg);
 
 #ifndef PRODUCT
   LogTarget(Trace, foreign, downcall) lt;
@@ -160,9 +159,6 @@ void DowncallStubGenerator::generate() {
   allocated_frame_size += arg_shuffle.out_arg_bytes();
 
   bool should_save_return_value = !_needs_return_buffer;
-
-  // when we don't use a return buffer we need to spill the return value around our slowpath calls
-  // when we use a return buffer case this SHOULD be unused.
   RegSpiller out_reg_spiller(_output_registers);
   int spill_offset = -1;
 
@@ -215,7 +211,7 @@ void DowncallStubGenerator::generate() {
   __ block_comment("} thread java2native");
 
   __ block_comment("{ argument shuffle");
-  arg_shuffle.generate(_masm, shufffle_reg, 0, _abi._shadow_space_bytes, locs);
+  arg_shuffle.generate(_masm, shuffle_reg, 0, _abi._shadow_space_bytes, locs);
   __ block_comment("} argument shuffle");
 
   // jump to foreign funtion.

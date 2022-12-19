@@ -126,7 +126,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
   const CallRegs call_regs = ForeignGlobals::parse_call_regs(jconv);
   CodeBuffer buffer("upcall_stub", /* code_size = */ 2048, /* locs_size = */ 1024);
 
-  Register shuffle_reg = t2;
+  Register shuffle_reg = x9;
   JavaCallingConvention out_conv;
   NativeCallingConvention in_conv(call_regs._arg_regs);
   ArgumentShuffle arg_shuffle(in_sig_bt, total_in_args, out_sig_bt, total_out_args, &in_conv, &out_conv, as_VMStorage(shuffle_reg));
@@ -148,13 +148,13 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
   }
 
   int reg_save_area_size = compute_reg_save_area_size(abi);
-  RegSpiller arg_spilller(call_regs._arg_regs);
+  RegSpiller arg_spiller(call_regs._arg_regs);
   RegSpiller result_spiller(call_regs._ret_regs);
 
   int shuffle_area_offset = 0;
   int res_save_area_offset = shuffle_area_offset + out_arg_area;
   int arg_save_area_offset = res_save_area_offset + result_spiller.spill_size_bytes();
-  int reg_save_area_offset = arg_save_area_offset + arg_spilller.spill_size_bytes();
+  int reg_save_area_offset = arg_save_area_offset + arg_spiller.spill_size_bytes();
   // build FrameData for stack traverse.
   int frame_data_offset = reg_save_area_offset + reg_save_area_size;
   int frame_bottom_offset = frame_data_offset + sizeof(UpcallStub::FrameData);
@@ -206,7 +206,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
 
   // we have to always spill args since we need to do a call to get the thread
   // (and maybe attach it). so store those registers temporarily.
-  arg_spilller.generate_spill(_masm, arg_save_area_offset);
+  arg_spiller.generate_spill(_masm, arg_save_area_offset);
   preserve_callee_saved_registers(_masm, abi, reg_save_area_offset);
 
   __ block_comment("{ on_entry");
@@ -218,7 +218,7 @@ address UpcallLinker::make_upcall_stub(jobject receiver, Method* entry,
 
   __ block_comment("{ argument shuffle");
   // before shuffle, restore registers.
-  arg_spilller.generate_fill(_masm, arg_save_area_offset);
+  arg_spiller.generate_fill(_masm, arg_save_area_offset);
   if (needs_return_buffer) {
     assert(ret_buf_offset != -1, "no return buffer allocated");
     __ la(as_Register(locs.get(StubLocations::RETURN_BUFFER)), Address(sp, ret_buf_offset));
