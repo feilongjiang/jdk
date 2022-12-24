@@ -238,8 +238,8 @@ public class LinuxRISCV64CallArranger {
         // When handling variadic part, integer calling convention should be used.
         static final Map<TypeClass, TypeClass> conventionConverterMap =
                 Map.ofEntries(Map.entry(FLOAT, INTEGER),
-                              Map.entry(STRUCT_FA, STRUCT_A),
-                              Map.entry(STRUCT_BOTH, STRUCT_A));
+                              Map.entry(STRUCT_F, STRUCT_X),
+                              Map.entry(STRUCT_BOTH, STRUCT_X));
     }
 
     static class UnboxBindingCalculator extends BindingCalculator {
@@ -276,7 +276,7 @@ public class LinuxRISCV64CallArranger {
                     bindings.vmStore(storage, long.class);
                 }
 
-                case STRUCT_A -> {
+                case STRUCT_X -> {
                     assert carrier == MemorySegment.class;
                     VMStorage[] locations = storageCalculator.getStorages(
                             layout);
@@ -296,7 +296,7 @@ public class LinuxRISCV64CallArranger {
                     }
                 }
 
-                case STRUCT_FA -> {
+                case STRUCT_F -> {
                     assert carrier == MemorySegment.class;
                     List<FlattenedFieldDesc> descs = getFlattenedFields((GroupLayout) layout);
                     if (storageCalculator.availableRegs(0, descs.size())) {
@@ -311,7 +311,7 @@ public class LinuxRISCV64CallArranger {
                         }
                     } else {
                         // If there is not enough register can be used, then fall back to integer calling convention.
-                        return getBindings(carrier, layout, STRUCT_A, isVariadicArg);
+                        return getBindings(carrier, layout, STRUCT_X, isVariadicArg);
                     }
                 }
 
@@ -329,7 +329,7 @@ public class LinuxRISCV64CallArranger {
                                     .vmStore(storage, type);
                         }
                     } else {
-                        return getBindings(carrier, layout, STRUCT_A, isVariadicArg);
+                        return getBindings(carrier, layout, STRUCT_X, isVariadicArg);
                     }
                 }
 
@@ -380,7 +380,7 @@ public class LinuxRISCV64CallArranger {
                             .boxAddressRaw(Utils.pointeeSize(layout));
                 }
 
-                case STRUCT_A -> {
+                case STRUCT_X -> {
                     assert carrier == MemorySegment.class;
                     bindings.allocate(layout);
                     VMStorage[] locations = storageCalculator.getStorages(
@@ -398,7 +398,7 @@ public class LinuxRISCV64CallArranger {
                     }
                 }
 
-                case STRUCT_FA -> {
+                case STRUCT_F -> {
                     assert carrier == MemorySegment.class;
                     bindings.allocate(layout);
                     List<FlattenedFieldDesc> descs = getFlattenedFields((GroupLayout) layout);
@@ -412,7 +412,7 @@ public class LinuxRISCV64CallArranger {
                                     .bufferStore(desc.offset(), type);
                         }
                     } else {
-                        return getBindings(carrier, layout, STRUCT_A, isVariadicArg);
+                        return getBindings(carrier, layout, STRUCT_X, isVariadicArg);
                     }
                 }
 
@@ -431,7 +431,7 @@ public class LinuxRISCV64CallArranger {
                                     .bufferStore(desc.offset(), type);
                         }
                     } else {
-                        return getBindings(carrier, layout, STRUCT_A, isVariadicArg);
+                        return getBindings(carrier, layout, STRUCT_X, isVariadicArg);
                     }
                 }
 

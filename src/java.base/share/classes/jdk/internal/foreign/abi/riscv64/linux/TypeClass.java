@@ -37,37 +37,35 @@ import java.util.List;
 
 public enum TypeClass {
     /*
-     * STRUCT_REFERENCE: Struct and its width > 16B, it will be replaced by its reference.
-     *     The reference shall be passed by integer register when a register is available,
-     *     otherwise the reference will be passed by stack.
+     * STRUCT_REFERENCE: Struct larger than 16B are passed by reference and are replaced
+     *     in the argument list with the address. The address will be passed by integer
+     *     register if a register is available, otherwise it will be passed by stack.
      *
-     * STRUCT_FA: Struct contains one or two floating-point fields and its width <= 16B.
-     *     Should be passed by one or two float-pointing argument registers, if registers available,
-     *     otherwise be passed by stack.
+     * STRUCT_F: Struct contains one or two floating-point fields and its width <= 16B.
+     *     The struct will be passed by one or two float-pointing argument registers if
+     *     registers are available, otherwise it will be passed by stack.
      *
      * STRUCT_BOTH: Struct contains both an integer field and a floating-point field
-     *     and its width <= 16B, shall be passed by both a floating-point argument register
-     *     and an integer argument register where both a float register and an integer is available.
+     *     and its width <= 16B. The struct will be passed by both a floating-point
+     *     argument register and an integer argument register where both a float register
+     *     and an integer are available, otherwise it will be passed by stack.
      *
-     * STRUCT_A: Struct and its width <= 16B.
-     *     Should be passed by one or two integer argument register if registers are available,
-     *     otherwise it will be passed by stack.
+     * STRUCT_X: Struct and its width <= 16B. The struct will be passed by one or two integer
+     *     argument register if registers are available, otherwise it will be passed by stack.
      *
-     * See https://github.com/riscv-non-isa/riscv-elf-psabi-doc
+     * See https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-cc.adoc
      * */
     INTEGER,
     FLOAT,
     POINTER,
-    STRUCT_A,
-    STRUCT_FA,
+    STRUCT_X,
+    STRUCT_F,
     STRUCT_BOTH,
     STRUCT_REFERENCE;
 
     /*
-     * Struct will be flattened while classifying and therefore should count its fields recursively.
-     *
-     * struct{struct{int, double}} will be treated same as struct{int, double}
-     * struct{int[2]} will be treated same as struct{int, int}
+     * Struct will be flattened while classifying. That is, struct{struct{int, double}} will be treated
+     * same as struct{int, double} and struct{int[2]} will be treated same as struct{int, int}.
      * */
     private static record FieldCounter(long integerCnt, long floatCnt, long pointerCnt) {
         static final FieldCounter EMPTY = new FieldCounter(0, 0, 0);
@@ -188,16 +186,16 @@ public enum TypeClass {
 
     private static TypeClass classifyStructType(GroupLayout layout) {
         if (layout instanceof UnionLayout) {
-            return isRegisterAggregate(layout) ? STRUCT_A : STRUCT_REFERENCE;
+            return isRegisterAggregate(layout) ? STRUCT_X : STRUCT_REFERENCE;
         }
 
         // classify struct by its fields.
         FieldCounter counter = FieldCounter.flatten(layout);
 
         if (!isRegisterAggregate(layout)) return STRUCT_REFERENCE;
-        else if (counter.isSTRUCT_FA()) return STRUCT_FA;
+        else if (counter.isSTRUCT_FA()) return STRUCT_F;
         else if (counter.isSTRUCT_BOTH()) return STRUCT_BOTH;
-        else return STRUCT_A;
+        else return STRUCT_X;
     }
 
     static TypeClass classifyLayout(MemoryLayout type) {
