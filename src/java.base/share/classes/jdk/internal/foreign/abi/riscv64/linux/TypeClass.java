@@ -112,7 +112,7 @@ public enum TypeClass {
                                     pointerCnt + other.pointerCnt);
         }
 
-        boolean isSTRUCT_FA() {
+        boolean isSTRUCT_F() {
             return integerCnt == 0 && pointerCnt == 0 &&
                     (floatCnt == 1 || floatCnt == 2);
         }
@@ -193,7 +193,7 @@ public enum TypeClass {
         FieldCounter counter = FieldCounter.flatten(layout);
 
         if (!isRegisterAggregate(layout)) return STRUCT_REFERENCE;
-        else if (counter.isSTRUCT_FA()) return STRUCT_F;
+        else if (counter.isSTRUCT_F()) return STRUCT_F;
         else if (counter.isSTRUCT_BOTH()) return STRUCT_BOTH;
         else return STRUCT_X;
     }
