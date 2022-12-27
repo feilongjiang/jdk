@@ -41,16 +41,16 @@ public enum TypeClass {
      *     in the argument list with the address. The address will be passed by integer
      *     register if a register is available, otherwise it will be passed by stack.
      *
-     * STRUCT_F: Struct contains one or two floating-point fields and its width <= 16B.
+     * STRUCT_F: Struct contains one or two floating-point fields and its size <= 16B.
      *     The struct will be passed by one or two float-pointing argument registers if
      *     registers are available, otherwise it will be passed by stack.
      *
      * STRUCT_BOTH: Struct contains both an integer field and a floating-point field
-     *     and its width <= 16B. The struct will be passed by both a floating-point
+     *     and its size <= 16B. The struct will be passed by both a floating-point
      *     argument register and an integer argument register where both a float register
      *     and an integer are available, otherwise it will be passed by stack.
      *
-     * STRUCT_X: Struct and its width <= 16B. The struct will be passed by one or two integer
+     * STRUCT_X: Struct and its size <= 16B. The struct will be passed by one or two integer
      *     argument register if registers are available, otherwise it will be passed by stack.
      *
      * See https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-cc.adoc
