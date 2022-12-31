@@ -151,6 +151,14 @@ public class LinuxRISCV64CallArranger {
             this.forArguments = forArguments;
         }
 
+        // Aggregates or scalars passed on the stack are aligned to the greater of
+        // the type alignment and XLEN bits, but never more than the stack alignment.
+        // No alignment of scalar will greater than STACK_SLOT_SIZE now.
+        void alignStack(long alignment) {
+            alignment = Utils.alignUp(Math.min(Math.max(alignment, STACK_SLOT_SIZE), 16), STACK_SLOT_SIZE);
+            stackOffset = Utils.alignUp(stackOffset, alignment);
+        }
+
         VMStorage stackAlloc() {
             assert forArguments : "no stack returns";
             VMStorage storage = stackStorage((short) STACK_SLOT_SIZE, (int) stackOffset);
@@ -184,8 +192,13 @@ public class LinuxRISCV64CallArranger {
             return stackAlloc();
         }
 
-        VMStorage[] getStorages(MemoryLayout layout) {
+        VMStorage[] getStorages(MemoryLayout layout, boolean isVariadicArg) {
             int regCnt = (int) SharedUtils.alignUp(layout.byteSize(), 8) / 8;
+            if (isVariadicArg && layout.byteAlignment() == 16 && layout.byteSize() <= 16) {
+                alignStorage();
+                // Two registers or stack slots will be allocated, even layout.byteSize <= 8B.
+                regCnt = 2;
+            }
             VMStorage[] storages = new VMStorage[regCnt];
             for (int i = 0; i < regCnt; i++) {
                 // use integer calling convention.
@@ -261,9 +274,6 @@ public class LinuxRISCV64CallArranger {
 
         List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, TypeClass argumentClass, boolean isVariadicArg) {
             Binding.Builder bindings = Binding.builder();
-            if (isVariadicArg && layout.byteSize() <= 16 && layout.byteAlignment() == 16) {
-                storageCalculator.alignStorage();
-            }
             switch (argumentClass) {
                 case INTEGER, FLOAT -> {
                     VMStorage storage = storageCalculator.getStorage(StorageType.fromTypeClass(argumentClass));
@@ -278,15 +288,19 @@ public class LinuxRISCV64CallArranger {
 
                 case STRUCT_X -> {
                     assert carrier == MemorySegment.class;
-                    VMStorage[] locations = storageCalculator.getStorages(
-                            layout);
+
+                    // When no register is available, struct will be passed by stack.
+                    // Before allocation, stack must be aligned.
+                    if (!storageCalculator.availableRegs(1, 0)) {
+                        storageCalculator.alignStack(layout.byteAlignment());
+                    }
+                    VMStorage[] locations = storageCalculator.getStorages(layout, isVariadicArg);
                     int locIndex = 0;
                     long offset = 0;
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = storage.type() == StorageType.FLOAT;
-                        Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
+                        Class<?> type = SharedUtils.primitiveCarrierForSize(copy, false);
                         if (offset + copy < layout.byteSize()) {
                             bindings.dup();
                         }
@@ -365,9 +379,6 @@ public class LinuxRISCV64CallArranger {
 
         List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, TypeClass argumentClass, boolean isVariadicArg) {
             Binding.Builder bindings = Binding.builder();
-            if (isVariadicArg && layout.byteSize() <= 16 && layout.byteAlignment() == 16) {
-                storageCalculator.alignStorage();
-            }
             switch (argumentClass) {
                 case INTEGER, FLOAT -> {
                     VMStorage storage = storageCalculator.getStorage(StorageType.fromTypeClass(argumentClass));
@@ -382,16 +393,20 @@ public class LinuxRISCV64CallArranger {
 
                 case STRUCT_X -> {
                     assert carrier == MemorySegment.class;
+
+                    // When no register is available, struct will be passed by stack.
+                    // Before allocation, stack must be aligned.
+                    if (!storageCalculator.availableRegs(1, 0)) {
+                        storageCalculator.alignStack(layout.byteAlignment());
+                    }
                     bindings.allocate(layout);
-                    VMStorage[] locations = storageCalculator.getStorages(
-                            layout);
+                    VMStorage[] locations = storageCalculator.getStorages(layout, isVariadicArg);
                     int locIndex = 0;
                     long offset = 0;
                     while (offset < layout.byteSize()) {
                         final long copy = Math.min(layout.byteSize() - offset, 8);
                         VMStorage storage = locations[locIndex++];
-                        boolean useFloat = storage.type() == StorageType.FLOAT;
-                        Class<?> type = SharedUtils.primitiveCarrierForSize(copy, useFloat);
+                        Class<?> type = SharedUtils.primitiveCarrierForSize(copy, false);
                         bindings.dup().vmLoad(storage, type)
                                 .bufferStore(offset, type);
                         offset += copy;
