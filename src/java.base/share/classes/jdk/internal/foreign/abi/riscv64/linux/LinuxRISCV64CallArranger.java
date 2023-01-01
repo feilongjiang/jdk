@@ -169,10 +169,8 @@ public class LinuxRISCV64CallArranger {
         Optional<VMStorage> regAlloc(int storageClass) {
             var availableRegs = MAX_REGISTER_ARGUMENTS - nRegs[storageClass];
             if (availableRegs > 0) {
-                VMStorage[] source =
-                    (forArguments ? CLinux.inputStorage : CLinux.outputStorage)[storageClass];
-                Optional<VMStorage> result =
-                    Optional.of(source[nRegs[storageClass]]);
+                VMStorage[] source = (forArguments ? CLinux.inputStorage : CLinux.outputStorage)[storageClass];
+                Optional<VMStorage> result = Optional.of(source[nRegs[storageClass]]);
                 nRegs[storageClass] += 1;
                 return result;
             }

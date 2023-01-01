@@ -114,8 +114,7 @@ public enum TypeClass {
         }
 
         boolean isSTRUCT_REGISTER_F() {
-            return integerCnt == 0 && pointerCnt == 0 &&
-                    (floatCnt == 1 || floatCnt == 2);
+            return integerCnt == 0 && pointerCnt == 0 && (floatCnt == 1 || floatCnt == 2);
         }
 
         boolean isSTRUCT_REGISTER_XF() {
