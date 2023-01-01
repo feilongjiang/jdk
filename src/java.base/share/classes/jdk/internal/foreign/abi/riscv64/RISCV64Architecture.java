@@ -40,25 +40,11 @@ public class RISCV64Architecture implements Architecture {
     private static final int INTEGER_REG_SIZE = 8; // bytes
     private static final int FLOAT_REG_SIZE = 8;
 
-    // Enumeration values below must consistent with riscv64 backend.
     public interface StorageType {
         byte INTEGER = 0;
         byte FLOAT = 1;
         byte STACK = 2;
         byte PLACEHOLDER = 3;
-
-        public static int fromTypeClass(TypeClass typeClass) {
-            return switch (typeClass) {
-                case INTEGER, POINTER -> INTEGER;
-                case FLOAT -> FLOAT;
-                default -> -1;
-            };
-        }
-
-        public static int toIntegerClass(int floatClass) {
-            assert floatClass == FLOAT;
-            return INTEGER;
-        }
     }
 
     public static class Regs { // break circular dependency

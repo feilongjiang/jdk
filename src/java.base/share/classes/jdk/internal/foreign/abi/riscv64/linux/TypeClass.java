@@ -41,16 +41,16 @@ public enum TypeClass {
      *     in the argument list with the address. The address will be passed by integer
      *     register if a register is available, otherwise it will be passed by stack.
      *
-     * STRUCT_F: Struct contains one or two floating-point fields and its size <= 16B.
+     * STRUCT_REGISTER_F: Struct contains only one or two floating-point fields and its size <= 16B.
      *     The struct will be passed by one or two float-pointing argument registers if
      *     registers are available, otherwise it will be passed by stack.
      *
-     * STRUCT_BOTH: Struct contains both an integer field and a floating-point field
+     * STRUCT_REGISTER_XF: Struct contains both an integer field and a floating-point field
      *     and its size <= 16B. The struct will be passed by both a floating-point
      *     argument register and an integer argument register where both a float register
      *     and an integer are available, otherwise it will be passed by stack.
      *
-     * STRUCT_X: Struct and its size <= 16B. The struct will be passed by one or two integer
+     * STRUCT_REGISTER_X: Struct and its size <= 16B. The struct will be passed by one or two integer
      *     argument register if registers are available, otherwise it will be passed by stack.
      *
      * See https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-cc.adoc
@@ -58,10 +58,10 @@ public enum TypeClass {
     INTEGER,
     FLOAT,
     POINTER,
-    STRUCT_X,
-    STRUCT_F,
-    STRUCT_BOTH,
-    STRUCT_REFERENCE;
+    STRUCT_REFERENCE,
+    STRUCT_REGISTER_F,
+    STRUCT_REGISTER_XF,
+    STRUCT_REGISTER_X;
 
     /*
      * Struct will be flattened while classifying. That is, struct{struct{int, double}} will be treated
@@ -79,21 +79,22 @@ public enum TypeClass {
                     case INTEGER -> FieldCounter.SINGLE_INTEGER;
                     case FLOAT -> FieldCounter.SINGLE_FLOAT;
                     case POINTER -> FieldCounter.SINGLE_POINTER;
-                    default -> {
-                        assert false : "should not reach here.";
-                        yield null; /* should not reach here. */
-                    }
+                    default -> throw new IllegalStateException("Should not reach here.");
                 };
             } else if (layout instanceof GroupLayout groupLayout) {
                 FieldCounter currCounter = FieldCounter.EMPTY;
                 for (MemoryLayout memberLayout : groupLayout.memberLayouts()) {
-                    if (memberLayout instanceof PaddingLayout) continue;
+                    if (memberLayout instanceof PaddingLayout) {
+                        continue;
+                    }
                     currCounter = currCounter.add(flatten(memberLayout));
                 }
                 return currCounter;
             } else if (layout instanceof SequenceLayout sequenceLayout) {
                 long elementCount = sequenceLayout.elementCount();
-                if (elementCount == 0) return FieldCounter.EMPTY;
+                if (elementCount == 0) {
+                    return FieldCounter.EMPTY;
+                }
                 return flatten(sequenceLayout.elementLayout()).mul(elementCount);
             } else {
                 throw new IllegalStateException("Cannot get here: " + layout);
@@ -112,12 +113,12 @@ public enum TypeClass {
                                     pointerCnt + other.pointerCnt);
         }
 
-        boolean isSTRUCT_F() {
+        boolean isSTRUCT_REGISTER_F() {
             return integerCnt == 0 && pointerCnt == 0 &&
                     (floatCnt == 1 || floatCnt == 2);
         }
 
-        boolean isSTRUCT_BOTH() {
+        boolean isSTRUCT_REGISTER_XF() {
             return integerCnt == 1 && floatCnt == 1 && pointerCnt == 0;
         }
     }
@@ -132,10 +133,8 @@ public enum TypeClass {
             return List.of(switch (typeClass) {
                 case INTEGER, FLOAT ->
                         new FlattenedFieldDesc(typeClass, offset, valueLayout);
-                default -> {
-                    assert false : "should not reach here.";
-                    yield null; /* should not reach here. */
-                }
+                default ->
+                    throw new IllegalStateException("Should not reach here.");
             });
         } else if (layout instanceof GroupLayout groupLayout) {
             List<FlattenedFieldDesc> fields = new ArrayList<>();
@@ -186,16 +185,20 @@ public enum TypeClass {
 
     private static TypeClass classifyStructType(GroupLayout layout) {
         if (layout instanceof UnionLayout) {
-            return isRegisterAggregate(layout) ? STRUCT_X : STRUCT_REFERENCE;
+            return isRegisterAggregate(layout) ? STRUCT_REGISTER_X : STRUCT_REFERENCE;
         }
 
         // classify struct by its fields.
         FieldCounter counter = FieldCounter.flatten(layout);
-
-        if (!isRegisterAggregate(layout)) return STRUCT_REFERENCE;
-        else if (counter.isSTRUCT_F()) return STRUCT_F;
-        else if (counter.isSTRUCT_BOTH()) return STRUCT_BOTH;
-        else return STRUCT_X;
+        if (!isRegisterAggregate(layout)) {
+            return STRUCT_REFERENCE;
+        } else if (counter.isSTRUCT_REGISTER_F()) {
+            return STRUCT_REGISTER_F;
+        } else if (counter.isSTRUCT_REGISTER_XF()) {
+            return STRUCT_REGISTER_XF;
+        } else {
+            return STRUCT_REGISTER_X;
+        }
     }
 
     static TypeClass classifyLayout(MemoryLayout type) {

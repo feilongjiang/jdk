@@ -110,7 +110,7 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
                 postAlignStack(layout);
                 yield res;
             }
-            case STRUCT_X, STRUCT_F, STRUCT_BOTH -> {
+            case STRUCT_REGISTER_X, STRUCT_REGISTER_F, STRUCT_REGISTER_XF -> {
                 checkStackElement(layout);
                 // Struct is passed indirectly via a pointer in an integer register.
                 MemorySegment slice = segment.asSlice(offset, layout.byteSize());
@@ -233,7 +233,9 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
         }
 
         public VaList build() {
-            if (isEmpty()) return EMPTY;
+            if (isEmpty()) {
+                return EMPTY;
+            }
             long stackArgsSize = 0;
             for (SimpleVaArg arg : stackArgs) {
                 MemoryLayout layout = arg.layout;

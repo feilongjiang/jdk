@@ -182,12 +182,16 @@ public class LinuxRISCV64CallArranger {
         // Try to get Storage corresponding to storageClass,
         VMStorage getStorage(int storageClass) {
             Optional<VMStorage> storage = regAlloc(storageClass);
-            if (storage.isPresent()) return storage.get();
+            if (storage.isPresent()) {
+                return storage.get();
+            }
             // If storageClass is StorageType.FLOAT, and no floating-point register is available,
             // try to allocate an integer register.
             if (storageClass == StorageType.FLOAT) {
-                storage = regAlloc(StorageType.toIntegerClass(storageClass));
-                if (storage.isPresent()) return storage.get();
+                storage = regAlloc(StorageType.INTEGER);
+                if (storage.isPresent()) {
+                    return storage.get();
+                }
             }
             return stackAlloc();
         }
@@ -251,8 +255,8 @@ public class LinuxRISCV64CallArranger {
         // When handling variadic part, integer calling convention should be used.
         static final Map<TypeClass, TypeClass> conventionConverterMap =
                 Map.ofEntries(Map.entry(FLOAT, INTEGER),
-                              Map.entry(STRUCT_F, STRUCT_X),
-                              Map.entry(STRUCT_BOTH, STRUCT_X));
+                              Map.entry(STRUCT_REGISTER_F, STRUCT_REGISTER_X),
+                              Map.entry(STRUCT_REGISTER_XF, STRUCT_REGISTER_X));
     }
 
     static class UnboxBindingCalculator extends BindingCalculator {
@@ -275,8 +279,13 @@ public class LinuxRISCV64CallArranger {
         List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, TypeClass argumentClass, boolean isVariadicArg) {
             Binding.Builder bindings = Binding.builder();
             switch (argumentClass) {
-                case INTEGER, FLOAT -> {
-                    VMStorage storage = storageCalculator.getStorage(StorageType.fromTypeClass(argumentClass));
+                case INTEGER -> {
+                    VMStorage storage = storageCalculator.getStorage(StorageType.INTEGER);
+                    bindings.vmStore(storage, carrier);
+                }
+
+                case FLOAT -> {
+                    VMStorage storage = storageCalculator.getStorage(StorageType.FLOAT);
                     bindings.vmStore(storage, carrier);
                 }
 
@@ -286,7 +295,7 @@ public class LinuxRISCV64CallArranger {
                     bindings.vmStore(storage, long.class);
                 }
 
-                case STRUCT_X -> {
+                case STRUCT_REGISTER_X -> {
                     assert carrier == MemorySegment.class;
 
                     // When no register is available, struct will be passed by stack.
@@ -310,40 +319,48 @@ public class LinuxRISCV64CallArranger {
                     }
                 }
 
-                case STRUCT_F -> {
+                case STRUCT_REGISTER_F -> {
                     assert carrier == MemorySegment.class;
                     List<FlattenedFieldDesc> descs = getFlattenedFields((GroupLayout) layout);
                     if (storageCalculator.availableRegs(0, descs.size())) {
                         for (int i = 0; i < descs.size(); i++) {
                             FlattenedFieldDesc desc = descs.get(i);
                             Class<?> type = desc.layout().carrier();
-                            VMStorage storage = storageCalculator.getStorage(
-                                    StorageType.fromTypeClass(desc.typeClass()));
-                            if (i < descs.size() - 1) bindings.dup();
+                            VMStorage storage = storageCalculator.getStorage(StorageType.FLOAT);
+                            if (i < descs.size() - 1) {
+                                bindings.dup();
+                            }
                             bindings.bufferLoad(desc.offset(), type)
                                     .vmStore(storage, type);
                         }
                     } else {
                         // If there is not enough register can be used, then fall back to integer calling convention.
-                        return getBindings(carrier, layout, STRUCT_X, isVariadicArg);
+                        return getBindings(carrier, layout, STRUCT_REGISTER_X, isVariadicArg);
                     }
                 }
 
-                case STRUCT_BOTH -> {
+                case STRUCT_REGISTER_XF -> {
                     assert carrier == MemorySegment.class;
                     if (storageCalculator.availableRegs(1, 1)) {
                         List<FlattenedFieldDesc> descs = getFlattenedFields((GroupLayout) layout);
                         for (int i = 0; i < 2; i++) {
-                            int storageClass = StorageType.fromTypeClass(descs.get(i).typeClass());
                             FlattenedFieldDesc desc = descs.get(i);
+                            int storageClass;
+                            if (desc.typeClass() == INTEGER) {
+                                storageClass = StorageType.INTEGER;
+                            } else {
+                                storageClass = StorageType.FLOAT;
+                            }
                             VMStorage storage = storageCalculator.getStorage(storageClass);
                             Class<?> type = desc.layout().carrier();
-                            if (i < 1) bindings.dup();
+                            if (i < 1) {
+                                bindings.dup();
+                            }
                             bindings.bufferLoad(desc.offset(), type)
                                     .vmStore(storage, type);
                         }
                     } else {
-                        return getBindings(carrier, layout, STRUCT_X, isVariadicArg);
+                        return getBindings(carrier, layout, STRUCT_REGISTER_X, isVariadicArg);
                     }
                 }
 
@@ -380,8 +397,13 @@ public class LinuxRISCV64CallArranger {
         List<Binding> getBindings(Class<?> carrier, MemoryLayout layout, TypeClass argumentClass, boolean isVariadicArg) {
             Binding.Builder bindings = Binding.builder();
             switch (argumentClass) {
-                case INTEGER, FLOAT -> {
-                    VMStorage storage = storageCalculator.getStorage(StorageType.fromTypeClass(argumentClass));
+                case INTEGER -> {
+                    VMStorage storage = storageCalculator.getStorage(StorageType.INTEGER);
+                    bindings.vmLoad(storage, carrier);
+                }
+
+                case FLOAT -> {
+                    VMStorage storage = storageCalculator.getStorage(StorageType.FLOAT);
                     bindings.vmLoad(storage, carrier);
                 }
 
@@ -391,7 +413,7 @@ public class LinuxRISCV64CallArranger {
                             .boxAddressRaw(Utils.pointeeSize(layout));
                 }
 
-                case STRUCT_X -> {
+                case STRUCT_REGISTER_X -> {
                     assert carrier == MemorySegment.class;
 
                     // When no register is available, struct will be passed by stack.
@@ -413,32 +435,36 @@ public class LinuxRISCV64CallArranger {
                     }
                 }
 
-                case STRUCT_F -> {
+                case STRUCT_REGISTER_F -> {
                     assert carrier == MemorySegment.class;
                     bindings.allocate(layout);
                     List<FlattenedFieldDesc> descs = getFlattenedFields((GroupLayout) layout);
                     if (storageCalculator.availableRegs(0, descs.size())) {
                         for (FlattenedFieldDesc desc : descs) {
                             Class<?> type = desc.layout().carrier();
-                            VMStorage storage = storageCalculator.getStorage(
-                                    StorageType.fromTypeClass(desc.typeClass()));
+                            VMStorage storage = storageCalculator.getStorage(StorageType.FLOAT);
                             bindings.dup()
                                     .vmLoad(storage, type)
                                     .bufferStore(desc.offset(), type);
                         }
                     } else {
-                        return getBindings(carrier, layout, STRUCT_X, isVariadicArg);
+                        return getBindings(carrier, layout, STRUCT_REGISTER_X, isVariadicArg);
                     }
                 }
 
-                case STRUCT_BOTH -> {
+                case STRUCT_REGISTER_XF -> {
                     assert carrier == MemorySegment.class;
                     bindings.allocate(layout);
                     if (storageCalculator.availableRegs(1, 1)) {
                         List<FlattenedFieldDesc> descs = getFlattenedFields((GroupLayout) layout);
                         for (int i = 0; i < 2; i++) {
                             FlattenedFieldDesc desc = descs.get(i);
-                            int storageClass = StorageType.fromTypeClass(desc.typeClass());
+                            int storageClass;
+                            if (desc.typeClass() == INTEGER) {
+                                storageClass = StorageType.INTEGER;
+                            } else {
+                                storageClass = StorageType.FLOAT;
+                            }
                             VMStorage storage = storageCalculator.getStorage(storageClass);
                             Class<?> type = desc.layout().carrier();
                             bindings.dup()
@@ -446,7 +472,7 @@ public class LinuxRISCV64CallArranger {
                                     .bufferStore(desc.offset(), type);
                         }
                     } else {
-                        return getBindings(carrier, layout, STRUCT_X, isVariadicArg);
+                        return getBindings(carrier, layout, STRUCT_REGISTER_X, isVariadicArg);
                     }
                 }
 
