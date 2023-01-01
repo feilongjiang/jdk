@@ -170,9 +170,9 @@ public class LinuxRISCV64CallArranger {
             var availableRegs = MAX_REGISTER_ARGUMENTS - nRegs[storageClass];
             if (availableRegs > 0) {
                 VMStorage[] source =
-                        (forArguments ? CLinux.inputStorage : CLinux.outputStorage)[storageClass];
+                    (forArguments ? CLinux.inputStorage : CLinux.outputStorage)[storageClass];
                 Optional<VMStorage> result =
-                        Optional.of(source[nRegs[storageClass]]);
+                    Optional.of(source[nRegs[storageClass]]);
                 nRegs[storageClass] += 1;
                 return result;
             }
@@ -368,8 +368,7 @@ public class LinuxRISCV64CallArranger {
                     assert carrier == MemorySegment.class;
                     bindings.copy(layout)
                             .unboxAddress();
-                    VMStorage storage = storageCalculator.getStorage(
-                            StorageType.INTEGER);
+                    VMStorage storage = storageCalculator.getStorage(StorageType.INTEGER);
                     bindings.vmStore(storage, long.class);
                 }
 
@@ -478,8 +477,7 @@ public class LinuxRISCV64CallArranger {
 
                 case STRUCT_REFERENCE -> {
                     assert carrier == MemorySegment.class;
-                    VMStorage storage = storageCalculator.getStorage(
-                            StorageType.INTEGER);
+                    VMStorage storage = storageCalculator.getStorage(StorageType.INTEGER);
                     bindings.vmLoad(storage, long.class)
                             .boxAddress(layout);
                 }

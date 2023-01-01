@@ -131,10 +131,8 @@ public enum TypeClass {
         if (layout instanceof ValueLayout valueLayout) {
             TypeClass typeClass = classifyValueType(valueLayout);
             return List.of(switch (typeClass) {
-                case INTEGER, FLOAT ->
-                        new FlattenedFieldDesc(typeClass, offset, valueLayout);
-                default ->
-                    throw new IllegalStateException("Should not reach here.");
+                case INTEGER, FLOAT -> new FlattenedFieldDesc(typeClass, offset, valueLayout);
+                default -> throw new IllegalStateException("Should not reach here.");
             });
         } else if (layout instanceof GroupLayout groupLayout) {
             List<FlattenedFieldDesc> fields = new ArrayList<>();

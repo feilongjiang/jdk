@@ -274,7 +274,5 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
             }
             return new LinuxRISCV64VaList(argsSegment, 0L);
         }
-
     }
-
 }
