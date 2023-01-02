@@ -67,6 +67,11 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
         this.offset = offset;
     }
 
+    private static LinuxRISCV64VaList readFromAddress(long address, SegmentScope scope) {
+        MemorySegment segment = MemorySegment.ofAddress(address, Long.MAX_VALUE, scope); // size unknown
+        return new LinuxRISCV64VaList(segment, 0);
+    }
+
     @Override
     public int nextVarg(ValueLayout.OfInt layout) {
         return (int) read(layout);
@@ -164,6 +169,14 @@ public non-sealed class LinuxRISCV64VaList implements VaList {
             preAlignStack(layout);
             postAlignStack(layout);
         }
+    }
+
+    static LinuxRISCV64VaList.Builder builder(SegmentScope scope) {
+        return new LinuxRISCV64VaList.Builder(scope);
+    }
+
+    public static VaList ofAddress(long address, SegmentScope scope) {
+        return readFromAddress(address, scope);
     }
 
     @Override

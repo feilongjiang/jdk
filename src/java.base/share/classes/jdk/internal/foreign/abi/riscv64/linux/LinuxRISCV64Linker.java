@@ -62,14 +62,13 @@ public final class LinuxRISCV64Linker extends AbstractLinker {
     }
 
     public static VaList newVaList(Consumer<VaList.Builder> actions, SegmentScope scope) {
-        LinuxRISCV64VaList.Builder builder = new LinuxRISCV64VaList.Builder(scope);
+        LinuxRISCV64VaList.Builder builder = LinuxRISCV64VaList.builder(scope);
         actions.accept(builder);
         return builder.build();
     }
 
     public static VaList newVaListOfAddress(long address, SegmentScope scope) {
-        MemorySegment segment = MemorySegment.ofAddress(address, Long.MAX_VALUE, scope); // size unknown
-        return new LinuxRISCV64VaList(segment, 0);
+        return LinuxRISCV64VaList.ofAddress(address, scope);
     }
 
     public static VaList emptyVaList() {

@@ -38,21 +38,27 @@ import java.util.List;
 
 public enum TypeClass {
     /*
-     * STRUCT_REFERENCE: Struct larger than 16B are passed by reference and are replaced
-     *     in the argument list with the address. The address will be passed by integer
-     *     register if a register is available, otherwise it will be passed by stack.
+     * STRUCT_REFERENCE: Aggregates larger than 2 * XLEN bits are passed by reference and are replaced
+     *     in the argument list with the address. The address will be passed in an register if at least
+     *     one register is available, otherwise it will be passed on the stack.
      *
-     * STRUCT_REGISTER_F: Struct contains only one or two floating-point fields and its size <= 16B.
-     *     The struct will be passed by one or two float-pointing argument registers if
-     *     registers are available, otherwise it will be passed by stack.
+     * STRUCT_REGISTER_F: A struct containing just one floating-point real is passed as though it were
+     *     a standalone floating-point real. A struct containing two floating-point reals is passed in two
+     *     floating-point registers, if neither real is more than ABI_FLEN bits wide and at least two
+     *     floating-point argument registers are available. (The registers need not be an aligned pair.)
+     *     Otherwise, it is passed according to the integer calling convention.
      *
-     * STRUCT_REGISTER_XF: Struct contains both an integer field and a floating-point field
-     *     and its size <= 16B. The struct will be passed by both a floating-point
-     *     argument register and an integer argument register where both a float register
-     *     and an integer are available, otherwise it will be passed by stack.
+     * STRUCT_REGISTER_XF: A struct containing one floating-point real and one integer (or bitfield), in either
+     *     order, is passed in a floating-point register and an integer register, provided the floating-point real
+     *     is no more than ABI_FLEN bits wide and the integer is no more than XLEN bits wide, and at least one
+     *     floating-point argument register and at least one integer argument register is available. If the struct
+     *     is not passed in this manner, then it is passed according to the integer calling convention.
      *
-     * STRUCT_REGISTER_X: Struct and its size <= 16B. The struct will be passed by one or two integer
-     *     argument register if registers are available, otherwise it will be passed by stack.
+     * STRUCT_REGISTER_X: Aggregates whose total size is no more than XLEN bits are passed in a register, with the
+     *     fields laid out as though they were passed in memory. If no register is available, the aggregate is
+     *     passed on the stack. Aggregates whose total size is no more than 2 * XLEN bits are passed in a pair of
+     *     registers; if only one register is available, the first XLEN bits are passed in a register and the
+     *     remaining bits are passed on the stack. If no registers are available, the aggregate is passed on the stack.
      *
      * See https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-cc.adoc
      * */
@@ -114,14 +120,6 @@ public enum TypeClass {
             return new FieldCounter(integerCnt + other.integerCnt,
                                     floatCnt + other.floatCnt,
                                     pointerCnt + other.pointerCnt);
-        }
-
-        boolean isSTRUCT_REGISTER_F() {
-            return integerCnt == 0 && pointerCnt == 0 && (floatCnt == 1 || floatCnt == 2);
-        }
-
-        boolean isSTRUCT_REGISTER_XF() {
-            return integerCnt == 1 && floatCnt == 1 && pointerCnt == 0;
         }
     }
 
@@ -194,9 +192,11 @@ public enum TypeClass {
 
         // classify struct by its fields.
         FieldCounter counter = FieldCounter.flatten(layout);
-        if (counter.isSTRUCT_REGISTER_F()) {
+        if (counter.integerCnt == 0 && counter.pointerCnt == 0 &&
+            (counter.floatCnt == 1 || counter.floatCnt == 2)) {
             return STRUCT_REGISTER_F;
-        } else if (counter.isSTRUCT_REGISTER_XF()) {
+        } else if (counter.integerCnt == 1 && counter.floatCnt == 1 &&
+            counter.pointerCnt == 0) {
             return STRUCT_REGISTER_XF;
         } else {
             return STRUCT_REGISTER_X;
