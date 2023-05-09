@@ -101,4 +101,15 @@ void C2HandleAnonOMOwnerStub::emit(C2_MacroAssembler& masm) {
   __ j(continuation());
 }
 
+int C2LoadNKlassStub::max_size() const {
+  return 8;
+}
+
+void C2LoadNKlassStub::emit(C2_MacroAssembler& masm) {
+  __ bind(entry());
+  Register d = dst();
+  __ ld(d, Address(d, OM_OFFSET_NO_MONITOR_VALUE_TAG(header)));
+  __ j(continuation());
+}
+
 #undef __

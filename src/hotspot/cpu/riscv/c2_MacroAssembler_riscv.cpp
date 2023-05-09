@@ -1333,6 +1333,16 @@ void C2_MacroAssembler::minmax_fp(FloatRegister dst, FloatRegister src1, FloatRe
   bind(Done);
 }
 
+void C2_MacroAssembler::load_nklass_compact(Register dst, Register obj) {
+    C2LoadNKlassStub* stub = new (Compile::current()->comp_arena()) C2LoadNKlassStub(dst);
+    Compile::current()->output()->add_stub(stub);
+    ld(dst, Address(obj, oopDesc::mark_offset_in_bytes()));
+    test_bit(t0, dst, exact_log2(markWord::monitor_value));
+    bnez(t0, stub->entry(), /* is_far */ true);
+    bind(stub->continuation());
+    srli(dst, dst, markWord::klass_shift);
+}
+
 void C2_MacroAssembler::element_compare(Register a1, Register a2, Register result, Register cnt, Register tmp1, Register tmp2,
                                         VectorRegister vr1, VectorRegister vr2, VectorRegister vrs, bool islatin, Label &DONE) {
   Label loop;

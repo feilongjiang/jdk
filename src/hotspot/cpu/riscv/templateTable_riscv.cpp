@@ -3477,12 +3477,26 @@ void TemplateTable::_new() {
 
     // The object is initialized before the header. If the object size is
     // zero, go directly to the header initialization.
-    __ sub(x13, x13, sizeof(oopDesc));
+    if (UseCompactObjectHeaders) {
+      __ sub(x13, x13, oopDesc::base_offset_in_bytes());
+    } else {
+      __ sub(x13, x13, sizeof(oopDesc));
+    }
     __ beqz(x13, initialize_header);
 
     // Initialize object fields
     {
-      __ add(x12, x10, sizeof(oopDesc));
+      if (UseCompactObjectHeaders) {
+        __ add(x12, x10, oopDesc::base_offset_in_bytes());
+        if (!is_aligned(oopDesc::base_offset_in_bytes(), BytesPerLong)) {
+          __ sw(zr, Address(x12, BytesPerInt));
+          __ add(x12, x12, BytesPerInt);
+          __ sub(x13, x13, BytesPerInt);
+          __ beqz(x13, initialize_header);
+        }
+      } else {
+        __ add(x12, x10, sizeof(oopDesc));
+      }
       Label loop;
       __ bind(loop);
       __ sd(zr, Address(x12));
@@ -3493,10 +3507,15 @@ void TemplateTable::_new() {
 
     // initialize object hader only.
     __ bind(initialize_header);
-    __ mv(t0, (intptr_t)markWord::prototype().value());
-    __ sd(t0, Address(x10, oopDesc::mark_offset_in_bytes()));
-    __ store_klass_gap(x10, zr);   // zero klass gap for compressed oops
-    __ store_klass(x10, x14);      // store klass last
+    if (UseCompactObjectHeaders) {
+      __ ld(t0, Address(x14, Klass::prototype_header_offset()));
+      __ sd(t0, Address(x10, oopDesc::mark_offset_in_bytes()));
+    } else {
+      __ mv(t0, (intptr_t)markWord::prototype().value());
+      __ sd(t0, Address(x10, oopDesc::mark_offset_in_bytes()));
+      __ store_klass_gap(x10, zr);  // zero klass gap for compressed oops
+      __ store_klass(x10, x14);     // store klass last
+    }
 
     {
       SkipIfEqual skip(_masm, &DTraceAllocProbes, false);

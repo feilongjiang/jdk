@@ -1539,7 +1539,18 @@ void LIR_Assembler::emit_load_klass(LIR_OpLoadKlass* op) {
   }
 
   if (UseCompressedClassPointers) {
-    __ lwu(result, Address(obj, oopDesc::klass_offset_in_bytes()));
+    if (UseCompactObjectHeaders) {
+      // Check if we can take the (common) fast path, if obj is unlocked
+      __ ld(result, Address(obj, oopDesc::mark_offset_in_bytes()));
+      __ test_bit(t0, result, exact_log2(markWord::monitor_value));
+      __ bnez(t0, *op->stub()->entry(), /* is_far */ true);
+      __ bind(*op->stub()->continuation());
+
+      // Shift to get proper narrow Klass*.
+      __ srli(result, result, markWord::klass_shift);
+    } else {
+      __ lwu(result, Address(obj, oopDesc::klass_offset_in_bytes()));
+    }
     __ decode_klass_not_null(result);
   } else {
     __ ld(result, Address(obj, oopDesc::klass_offset_in_bytes()));

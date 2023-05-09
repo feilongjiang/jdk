@@ -149,6 +149,8 @@
                  FloatRegister src1, FloatRegister src2,
                  bool is_double, bool is_min);
 
+  void load_nklass_compact(Register dst, Register src);
+
   // intrinsic methods implemented by rvv instructions
   void string_equals_v(Register r1, Register r2,
                        Register result, Register cnt1,
