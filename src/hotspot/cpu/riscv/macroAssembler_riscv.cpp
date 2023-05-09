@@ -2055,10 +2055,15 @@ void MacroAssembler::orptr(Address adr, RegisterOrConstant src, Register tmp1, R
   sd(tmp1, adr);
 }
 
+// Compare object klass with 'trial_klass' and if equal branch to label 'L'. Fall through otherwise.
 void MacroAssembler::cmp_klass(Register oop, Register trial_klass, Register tmp1, Register tmp2, Label &L) {
   assert_different_registers(oop, trial_klass, tmp1, tmp2);
   if (UseCompressedClassPointers) {
-    lwu(tmp1, Address(oop, oopDesc::klass_offset_in_bytes()));
+    if (UseCompactObjectHeaders) {
+      load_nklass_compact(tmp1, oop, tmp2);
+    } else {
+      lwu(tmp1, Address(oop, oopDesc::klass_offset_in_bytes()));
+    }
     if (CompressedKlassPointers::base() == nullptr) {
       slli(tmp1, tmp1, CompressedKlassPointers::shift());
       beq(trial_klass, tmp1, L);
@@ -2249,10 +2254,35 @@ void MacroAssembler::encode_heap_oop(Register d, Register s) {
   }
 }
 
+// Loads the obj's Klass* into dst.
+// Preserves src.
+void MacroAssembler::load_nklass_compact(Register dst, Register src, Register tmp) {
+  assert(UseCompressedClassPointers, "expects UseCompressedClassPointers");
+  assert_different_registers(dst, tmp);
+  assert_different_registers(src, tmp);
+
+  Label fast;
+
+  // Check if we can take the (common) fast path, if obj is unlocked.
+  ld(dst, Address(src, oopDesc::mark_offset_in_bytes()));
+  test_bit(tmp, dst, exact_log2(markWord::monitor_value));
+  beqz(tmp, fast);
+
+  // Fetch displaced header
+  ld(dst, Address(dst, OM_OFFSET_NO_MONITOR_VALUE_TAG(header)));
+
+  // Fast-path: shift and decode Klass*.
+  bind(fast);
+  srli(dst, dst, markWord::klass_shift);
+}
+
 void MacroAssembler::load_klass(Register dst, Register src, Register tmp) {
   assert_different_registers(dst, tmp);
   assert_different_registers(src, tmp);
-  if (UseCompressedClassPointers) {
+  if (UseCompactObjectHeaders) {
+    load_nklass_compact(dst, src, tmp);
+    decode_klass_not_null(dst, tmp);
+  } else if (UseCompressedClassPointers) {
     lwu(dst, Address(src, oopDesc::klass_offset_in_bytes()));
     decode_klass_not_null(dst, tmp);
   } else {
@@ -2263,6 +2293,7 @@ void MacroAssembler::load_klass(Register dst, Register src, Register tmp) {
 void MacroAssembler::store_klass(Register dst, Register src, Register tmp) {
   // FIXME: Should this be a store release? concurrent gcs assumes
   // klass length is valid if klass field is not null.
+  assert(!UseCompactObjectHeaders, "not with compact headers");
   if (UseCompressedClassPointers) {
     encode_klass_not_null(src, tmp);
     sw(src, Address(dst, oopDesc::klass_offset_in_bytes()));
@@ -2272,6 +2303,7 @@ void MacroAssembler::store_klass(Register dst, Register src, Register tmp) {
 }
 
 void MacroAssembler::store_klass_gap(Register dst, Register src) {
+  assert(!UseCompactObjectHeaders, "not with compact headers");
   if (UseCompressedClassPointers) {
     // Store to klass gap in destination
     sw(src, Address(dst, oopDesc::klass_gap_offset_in_bytes()));

@@ -194,7 +194,10 @@ void LIR_Assembler::arraycopy_type_check(Register src, Register src_pos, Registe
   // We don't know the array types are compatible
   if (basic_type != T_OBJECT) {
     // Simple test for basic type arrays
-    if (UseCompressedClassPointers) {
+    if (UseCompactObjectHeaders) {
+      __ load_nklass_compact(tmp, src, t1 /* tmp */);
+      __ load_nklass_compact(t0, dst, t1 /* tmp */);
+    } else if (UseCompressedClassPointers) {
       __ lwu(tmp, Address(src, oopDesc::klass_offset_in_bytes()));
       __ lwu(t0, Address(dst, oopDesc::klass_offset_in_bytes()));
     } else {
@@ -254,32 +257,17 @@ void LIR_Assembler::arraycopy_assert(Register src, Register dst, Register tmp, c
     // dst type is exactly the expected type and the src type is a
     // subtype which we can't check or src is the same array as dst
     // but not necessarily exactly of type default_type.
-    Label known_ok, halt;
+    Label known_ok, cont, halt;
     __ mov_metadata(tmp, default_type->constant_encoding());
-    if (UseCompressedClassPointers) {
-      __ encode_klass_not_null(tmp);
-    }
 
     if (basic_type != T_OBJECT) {
-      if (UseCompressedClassPointers) {
-        __ lwu(t0, Address(dst, oopDesc::klass_offset_in_bytes()));
-      } else {
-        __ ld(t0, Address(dst, oopDesc::klass_offset_in_bytes()));
-      }
-      __ bne(tmp, t0, halt);
-      if (UseCompressedClassPointers) {
-        __ lwu(t0, Address(src, oopDesc::klass_offset_in_bytes()));
-      } else {
-        __ ld(t0, Address(src, oopDesc::klass_offset_in_bytes()));
-      }
-      __ beq(tmp, t0, known_ok);
+      __ cmp_klass(dst, tmp, t0, t1, cont);
+      __ j(halt);
+
+      __ bind(cont);
+      __ cmp_klass(src, tmp, t0, t1, known_ok);
     } else {
-      if (UseCompressedClassPointers) {
-        __ lwu(t0, Address(dst, oopDesc::klass_offset_in_bytes()));
-      } else {
-        __ ld(t0, Address(dst, oopDesc::klass_offset_in_bytes()));
-      }
-      __ beq(tmp, t0, known_ok);
+      __ cmp_klass(dst, tmp, t0, t1, known_ok);
       __ beq(src, dst, known_ok);
     }
     __ bind(halt);

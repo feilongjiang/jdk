@@ -176,6 +176,7 @@
 
   void signum_fp_v(VectorRegister dst, VectorRegister one, BasicType bt, int vlen);
 
+  void load_nklass_compact(Register dst, Register src, int disp);
 
   // intrinsic methods implemented by rvv instructions
 

@@ -33,6 +33,7 @@
 #include "c1/c1_Runtime1.hpp"
 #include "classfile/javaClasses.hpp"
 #include "nativeInst_riscv.hpp"
+#include "runtime/objectMonitor.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "vmreg_riscv.inline.hpp"
 
@@ -226,8 +227,11 @@ void MonitorExitStub::emit_code(LIR_Assembler* ce) {
 }
 
 void LoadKlassStub::emit_code(LIR_Assembler* ce) {
-  // Currently not needed.
-  Unimplemented();
+  assert(UseCompactObjectHeaders, "Only use with compact object headers");
+  __ bind(_entry);
+  Register d = _result->as_register();
+  __ ld(d, Address(d, OM_OFFSET_NO_MONITOR_VALUE_TAG(header)));
+  __ j(_continuation);
 }
 
 // Implementation of patching:

@@ -1958,6 +1958,26 @@ void C2_MacroAssembler::expand_bits_l_v(Register dst, Register src, Register mas
   expand_bits_v(dst, src, mask, /* is_long */ true);
 }
 
+void C2_MacroAssembler::load_nklass_compact(Register dst, Register obj, int disp) {
+  C2LoadNKlassStub* stub = new (Compile::current()->comp_arena()) C2LoadNKlassStub(dst);
+  Compile::current()->output()->add_stub(stub);
+
+  // Note: Don't clobber obj anywhere in that method!
+
+  // The incoming address is pointing into obj-start + klass_offset_in_bytes. We need to extract
+  // obj-start, so that we can load from the object's mark-word instead. Usually the address
+  // comes as obj-start in obj and klass_offset_in_bytes in disp. However, sometimes C2
+  // emits code that pre-computes obj-start + klass_offset_in_bytes into a register, and
+  // then passes that register as obj and 0 in disp. The following code extracts the base
+  // and offset to load the mark-word.
+  int offset = oopDesc::mark_offset_in_bytes() + disp - oopDesc::klass_offset_in_bytes();
+  ld(dst, Address(obj, offset));
+  test_bit(t0, dst, exact_log2(markWord::monitor_value));
+  bnez(t0, stub->entry(), /* is_far */ true);
+  bind(stub->continuation());
+  srli(dst, dst, markWord::klass_shift);
+}
+
 void C2_MacroAssembler::element_compare(Register a1, Register a2, Register result, Register cnt, Register tmp1, Register tmp2,
                                         VectorRegister vr1, VectorRegister vr2, VectorRegister vrs, bool islatin, Label &DONE) {
   Label loop;
