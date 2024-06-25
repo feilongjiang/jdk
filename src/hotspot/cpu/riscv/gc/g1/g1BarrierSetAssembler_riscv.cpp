@@ -109,7 +109,8 @@ static void generate_queue_test_and_insertion(MacroAssembler* masm, ByteSize ind
   __ sub(tmp1, tmp1, wordSize);                           // tmp1 := next index
   __ sd(tmp1, Address(thread, in_bytes(index_offset)));   // *(index address) := next index
   __ ld(tmp2, Address(thread, in_bytes(buffer_offset)));  // tmp2 := buffer address
-  __ sd(value, Address(tmp2, tmp1));                      // *(buffer address + next index) := value
+  __ add(tmp2, tmp2, tmp1);
+  __ sd(value, Address(tmp2));                      // *(buffer address + next index) := value
 }
 
 static Register generate_marking_active_test(MacroAssembler* masm, const Register thread, const Register tmp1) {
@@ -193,8 +194,8 @@ static Register generate_card_young_test(MacroAssembler* masm, const Register st
 }
 
 static Register generate_card_clean_test(MacroAssembler* masm, const Register tmp1 /* card address */, const Register tmp2) {
-  __ membar(Assembler::StoreLoad);  // StoreLoad membar
-  __ lbu(tmp2, Address(tmp1));      // tmp2 := card
+  __ membar(MacroAssembler::StoreLoad);  // StoreLoad membar
+  __ lbu(tmp2, Address(tmp1));           // tmp2 := card
   return tmp2;
 }
 
@@ -334,7 +335,7 @@ void G1BarrierSetAssembler::g1_write_barrier_post_c2(MacroAssembler* masm,
   Register card_val = generate_card_young_test(masm, store_addr, tmp1, tmp2);
   // From here on, tmp1 holds the card address.
   __ mv(t0, (int)G1CardTable::g1_young_card_val());
-  __ bne(card_val, t0, *stub->entry())
+  __ bne(card_val, t0, *stub->entry());
 
   __ bind(*stub->continuation());
 }
