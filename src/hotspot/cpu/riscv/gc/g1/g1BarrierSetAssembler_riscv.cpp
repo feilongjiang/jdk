@@ -110,7 +110,7 @@ static void generate_queue_test_and_insertion(MacroAssembler* masm, ByteSize ind
   __ sd(tmp1, Address(thread, in_bytes(index_offset)));   // *(index address) := next index
   __ ld(tmp2, Address(thread, in_bytes(buffer_offset)));  // tmp2 := buffer address
   __ add(tmp2, tmp2, tmp1);
-  __ sd(value, Address(tmp2));                      // *(buffer address + next index) := value
+  __ sd(value, Address(tmp2));                            // *(buffer address + next index) := value
 }
 
 static Register generate_marking_active_test(MacroAssembler* masm, const Register thread, const Register tmp1) {
@@ -152,8 +152,10 @@ void G1BarrierSetAssembler::g1_write_barrier_pre(MacroAssembler* masm,
   assert(pre_val != noreg && tmp1 != noreg && tmp2 != noreg, "expecting a register");
 
   Register is_marking_active = generate_marking_active_test(masm, thread, tmp1);
-
   __ beqz(tmp1, done);
+
+  Register is_pre_val_not_null = generate_pre_val_not_null_test(masm, obj, pre_val);
+  __ beqz(is_pre_val_not_null, done);
 
   generate_queue_test_and_insertion(masm,
                                     G1ThreadLocalData::satb_mark_queue_index_offset(),
@@ -180,7 +182,7 @@ void G1BarrierSetAssembler::g1_write_barrier_pre(MacroAssembler* masm,
 }
 
 static Register generate_region_crossing_test(MacroAssembler* masm, const Register store_addr, const Register new_val, const Register tmp1) {
-  __ xorr(tmp1, store_addr, new_val);                  // tmp1 := store address ^ new value
+  __ xorr(tmp1, store_addr, new_val);                    // tmp1 := store address ^ new value
   __ srli(tmp1, tmp1, G1HeapRegion::LogOfHRGrainBytes);  // tmp1 := ((store address ^ new value) >> LogOfHRGrainBytes)
   return tmp1;
 }
@@ -212,8 +214,8 @@ void G1BarrierSetAssembler::g1_write_barrier_post(MacroAssembler* masm,
                                                   Register tmp2) {
   assert(thread == xthread, "must be");
   assert_different_registers(store_addr, new_val, thread, tmp1, tmp2, t0);
-  assert(store_addr != noreg && new_val != noreg && tmp1 != noreg &&
-         tmp2 != noreg, "expecting a register");
+  assert(store_addr != noreg && new_val != noreg && tmp1 != noreg && tmp2 != noreg,
+         "expecting a register");
 
   Label done;
   Label runtime;
@@ -225,12 +227,14 @@ void G1BarrierSetAssembler::g1_write_barrier_post(MacroAssembler* masm,
   __ beqz(new_val, done);
 
   Register card_val = generate_card_young_test(masm, store_addr, tmp1, tmp2);
+  // From here on, tmp1 holds the card address.
   __ mv(t0, (int)G1CardTable::g1_young_card_val());
   __ beq(card_val, t0, done);   // card == young_card_val?
-  // From here on, tmp1 holds the card address.
 
   Register is_card_clean = generate_card_clean_test(masm, tmp1, tmp2);
   __ beqz(is_card_clean, done);
+
+  generate_dirty_card(masm, tmp1);
 
   generate_queue_test_and_insertion(masm,
                                     G1ThreadLocalData::dirty_card_queue_index_offset(),
