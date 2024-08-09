@@ -34,14 +34,14 @@ source %{
 #include "gc/g1/g1BarrierSetAssembler_riscv.hpp"
 #include "gc/g1/g1BarrierSetRuntime.hpp"
 
-static void g1_pre_write_barrier(MacroAssembler* masm,
-                                 const MachNode* node,
-                                 Register obj,
-                                 Register pre_val,
-                                 Register tmp1,
-                                 Register tmp2,
-                                 RegSet preserve = RegSet(),
-                                 RegSet no_preserve = RegSet()) {
+static void write_barrier_pre(MacroAssembler* masm,
+                              const MachNode* node,
+                              Register obj,
+                              Register pre_val,
+                              Register tmp1,
+                              Register tmp2,
+                              RegSet preserve = RegSet(),
+                              RegSet no_preserve = RegSet()) {
   if (!G1PreBarrierStubC2::needs_barrier(node)) {
     return;
   }
@@ -57,12 +57,12 @@ static void g1_pre_write_barrier(MacroAssembler* masm,
   g1_asm->g1_write_barrier_pre_c2(masm, obj, pre_val, xthread, tmp1, tmp2, stub);
 }
 
-static void g1_post_write_barrier(MacroAssembler* masm,
-                                  const MachNode* node,
-                                  Register store_addr,
-                                  Register new_val,
-                                  Register tmp1,
-                                  Register tmp2) {
+static void write_barrier_post(MacroAssembler* masm,
+                               const MachNode* node,
+                               Register store_addr,
+                               Register new_val,
+                               Register tmp1,
+                               Register tmp2) {
   if (!G1PostBarrierStubC2::needs_barrier(node)) {
     return;
   }
@@ -83,18 +83,18 @@ instruct g1StoreP(indirect mem, iRegP src, iRegPNoSp tmp1, iRegPNoSp tmp2, iRegP
   format %{ "sd  $src, $mem\t# ptr" %}
   ins_encode %{
     guarantee($mem$$disp == 0, "impossible encoding");
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $src$$Register) /* preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $src$$Register) /* preserve */);
     __ sd($src$$Register, Address($mem$$Register));
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $src$$Register  /* new_val */,
-                          $tmp2$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $src$$Register  /* new_val */,
+                       $tmp2$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(istore_reg_mem);
 %}
@@ -108,12 +108,12 @@ instruct g1StoreN(indirect mem, iRegN src, iRegPNoSp tmp1, iRegPNoSp tmp2, iRegP
   format %{ "sw  $src, $mem\t# compressed ptr" %}
   ins_encode %{
     guarantee($mem$$disp == 0, "impossible encoding");
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $src$$Register) /* preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $src$$Register) /* preserve */);
     __ sw($src$$Register, Address($mem$$Register));
     if ((barrier_data() & G1C2BarrierPost) != 0) {
       if ((barrier_data() & G1C2BarrierPostNotNull) == 0) {
@@ -122,11 +122,11 @@ instruct g1StoreN(indirect mem, iRegN src, iRegPNoSp tmp1, iRegPNoSp tmp2, iRegP
         __ decode_heap_oop_not_null($tmp1$$Register, $src$$Register);
       }
     }
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $tmp1$$Register /* new_val */,
-                          $tmp2$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $tmp1$$Register /* new_val */,
+                       $tmp2$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(istore_reg_mem);
 %}
@@ -141,23 +141,23 @@ instruct g1EncodePAndStoreN(indirect mem, iRegP src, iRegPNoSp tmp1, iRegPNoSp t
             "sw  $tmp1, $mem\t# compressed ptr" %}
   ins_encode %{
     guarantee($mem$$disp == 0, "impossible encoding");
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $src$$Register) /* preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $src$$Register) /* preserve */);
     if ((barrier_data() & G1C2BarrierPostNotNull) == 0) {
       __ encode_heap_oop($tmp1$$Register, $src$$Register);
     } else {
       __ encode_heap_oop_not_null($tmp1$$Register, $src$$Register);
     }
     __ sw($tmp1$$Register, Address($mem$$Register));
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $src$$Register  /* new_val */,
-                          $tmp2$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $src$$Register  /* new_val */,
+                       $tmp2$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(istore_reg_mem);
 %}
@@ -173,22 +173,22 @@ instruct g1CompareAndExchangeP(iRegPNoSp res, indirect mem, iRegP oldval, iRegP 
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($oldval$$Register, $mem$$Register);
     assert_different_registers($newval$$Register, $mem$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
-                         RegSet::of($res$$Register) /* no_preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
+                      RegSet::of($res$$Register) /* no_preserve */);
     __ mv($tmp1$$Register, $oldval$$Register);
     __ mv($tmp2$$Register, $newval$$Register);
     __ cmpxchg($mem$$Register, $oldval$$Register, $newval$$Register, Assembler::int64,
                /*acquire*/ Assembler::relaxed, /*release*/ Assembler::rl, $res$$Register);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $tmp2$$Register /* new_val */,
-                          $tmp1$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $tmp2$$Register /* new_val */,
+                       $tmp1$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(pipe_slow);
 %}
@@ -204,22 +204,22 @@ instruct g1CompareAndExchangePAcq(iRegPNoSp res, indirect mem, iRegP oldval, iRe
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($oldval$$Register, $mem$$Register);
     assert_different_registers($newval$$Register, $mem$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
-                         RegSet::of($res$$Register) /* no_preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
+                      RegSet::of($res$$Register) /* no_preserve */);
     __ mv($tmp1$$Register, $oldval$$Register);
     __ mv($tmp2$$Register, $newval$$Register);
     __ cmpxchg($mem$$Register, $oldval$$Register, $newval$$Register, Assembler::int64,
                /*acquire*/ Assembler::aq, /*release*/ Assembler::rl, $res$$Register);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $tmp2$$Register /* new_val */,
-                          $tmp1$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $tmp2$$Register /* new_val */,
+                       $tmp1$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(pipe_slow);
 %}
@@ -235,23 +235,23 @@ instruct g1CompareAndExchangeN(iRegNNoSp res, indirect mem, iRegN oldval, iRegN 
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($oldval$$Register, $mem$$Register);
     assert_different_registers($newval$$Register, $mem$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
-                         RegSet::of($res$$Register) /* no_preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
+                      RegSet::of($res$$Register) /* no_preserve */);
     __ mv($tmp1$$Register, $oldval$$Register);
     __ mv($tmp2$$Register, $newval$$Register);
     __ cmpxchg($mem$$Register, $oldval$$Register, $newval$$Register, Assembler::uint32,
                /*acquire*/ Assembler::relaxed, /*release*/ Assembler::rl, $res$$Register);
     __ decode_heap_oop($tmp2$$Register);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $tmp2$$Register /* new_val */,
-                          $tmp1$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $tmp2$$Register /* new_val */,
+                       $tmp1$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(pipe_slow);
 %}
@@ -267,23 +267,23 @@ instruct g1CompareAndExchangeNAcq(iRegNNoSp res, indirect mem, iRegN oldval, iRe
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($oldval$$Register, $mem$$Register);
     assert_different_registers($newval$$Register, $mem$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
-                         RegSet::of($res$$Register) /* no_preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
+                      RegSet::of($res$$Register) /* no_preserve */);
     __ mv($tmp1$$Register, $oldval$$Register);
     __ mv($tmp2$$Register, $newval$$Register);
     __ cmpxchg($mem$$Register, $oldval$$Register, $newval$$Register, Assembler::uint32,
                /*acquire*/ Assembler::aq, /*release*/ Assembler::rl, $res$$Register);
     __ decode_heap_oop($tmp2$$Register);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $tmp2$$Register /* new_val */,
-                          $tmp1$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $tmp2$$Register /* new_val */,
+                       $tmp1$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(pipe_slow);
 %}
@@ -301,23 +301,23 @@ instruct g1CompareAndSwapP(iRegINoSp res, indirect mem, iRegP newval, iRegPNoSp 
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($oldval$$Register, $mem$$Register);
     assert_different_registers($newval$$Register, $mem$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
-                         RegSet::of($res$$Register) /* no_preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
+                      RegSet::of($res$$Register) /* no_preserve */);
     __ mv($tmp1$$Register, $oldval$$Register);
     __ mv($tmp2$$Register, $newval$$Register);
     __ cmpxchg($mem$$Register, $oldval$$Register, $newval$$Register, Assembler::int64,
                /*acquire*/ Assembler::relaxed, /*release*/ Assembler::rl, $res$$Register,
                /*result as bool*/ true);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $tmp2$$Register /* new_val */,
-                          $tmp1$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $tmp2$$Register /* new_val */,
+                       $tmp1$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(pipe_slow);
 %}
@@ -335,23 +335,23 @@ instruct g1CompareAndSwapPAcq(iRegINoSp res, indirect mem, iRegP newval, iRegPNo
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($oldval$$Register, $mem$$Register);
     assert_different_registers($newval$$Register, $mem$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
-                         RegSet::of($res$$Register) /* no_preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
+                      RegSet::of($res$$Register) /* no_preserve */);
     __ mv($tmp1$$Register, $oldval$$Register);
     __ mv($tmp2$$Register, $newval$$Register);
     __ cmpxchg($mem$$Register, $oldval$$Register, $newval$$Register, Assembler::int64,
                /*acquire*/ Assembler::aq, /*release*/ Assembler::rl, $res$$Register,
                /*result as bool*/ true);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $tmp2$$Register /* new_val */,
-                          $tmp1$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $tmp2$$Register /* new_val */,
+                       $tmp1$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(pipe_slow);
 %}
@@ -369,24 +369,24 @@ instruct g1CompareAndSwapN(iRegINoSp res, indirect mem, iRegN newval, iRegPNoSp 
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($oldval$$Register, $mem$$Register);
     assert_different_registers($newval$$Register, $mem$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
-                         RegSet::of($res$$Register) /* no_preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
+                      RegSet::of($res$$Register) /* no_preserve */);
     __ mv($tmp1$$Register, $oldval$$Register);
     __ mv($tmp2$$Register, $newval$$Register);
     __ cmpxchg($mem$$Register, $oldval$$Register, $newval$$Register, Assembler::uint32,
                /*acquire*/ Assembler::relaxed, /*release*/ Assembler::rl, $res$$Register,
                /*result as bool*/ true);
     __ decode_heap_oop($tmp2$$Register);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $tmp2$$Register /* new_val */,
-                          $tmp1$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $tmp2$$Register /* new_val */,
+                       $tmp1$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(pipe_slow);
 %}
@@ -404,24 +404,24 @@ instruct g1CompareAndSwapNAcq(iRegINoSp res, indirect mem, iRegN newval, iRegPNo
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($oldval$$Register, $mem$$Register);
     assert_different_registers($newval$$Register, $mem$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
-                         RegSet::of($res$$Register) /* no_preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $oldval$$Register, $newval$$Register) /* preserve */,
+                      RegSet::of($res$$Register) /* no_preserve */);
     __ mv($tmp1$$Register, $oldval$$Register);
     __ mv($tmp2$$Register, $newval$$Register);
     __ cmpxchg($mem$$Register, $oldval$$Register, $newval$$Register, Assembler::uint32,
               /*acquire*/ Assembler::aq, /*release*/ Assembler::rl, $res$$Register,
               /*result as bool*/ true);
     __ decode_heap_oop($tmp2$$Register);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $tmp2$$Register /* new_val */,
-                          $tmp1$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $tmp2$$Register /* new_val */,
+                       $tmp1$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(pipe_slow);
 %}
@@ -436,18 +436,18 @@ instruct g1XChgP(indirect mem, iRegP newval, iRegPNoSp tmp1, iRegPNoSp tmp2, iRe
   ins_encode %{
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($mem$$Register, $newval$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register    /* obj */,
-                         $preval$$Register /* pre_val (as a temporary register) */,
-                         $tmp1$$Register   /* tmp1 */,
-                         $tmp2$$Register   /* tmp2 */,
-                         RegSet::of($mem$$Register, $preval$$Register, $newval$$Register) /* preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register    /* obj */,
+                      $preval$$Register /* pre_val (as a temporary register) */,
+                      $tmp1$$Register   /* tmp1 */,
+                      $tmp2$$Register   /* tmp2 */,
+                      RegSet::of($mem$$Register, $preval$$Register, $newval$$Register) /* preserve */);
     __ atomic_xchg($preval$$Register, $newval$$Register, $mem$$Register);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register    /* store_addr */,
-                          $newval$$Register /* new_val */,
-                          $tmp1$$Register   /* tmp1 */,
-                          $tmp2$$Register   /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register    /* store_addr */,
+                       $newval$$Register /* new_val */,
+                       $tmp1$$Register   /* tmp1 */,
+                       $tmp2$$Register   /* tmp2 */);
   %}
   ins_pipe(pipe_serial);
 %}
@@ -462,18 +462,18 @@ instruct g1XChgPAcq(indirect mem, iRegP newval, iRegPNoSp tmp1, iRegPNoSp tmp2, 
   ins_encode %{
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($mem$$Register, $newval$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register    /* obj */,
-                         $preval$$Register /* pre_val (as a temporary register) */,
-                         $tmp1$$Register   /* tmp1 */,
-                         $tmp2$$Register   /* tmp2 */,
-                         RegSet::of($mem$$Register, $preval$$Register, $newval$$Register) /* preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register    /* obj */,
+                      $preval$$Register /* pre_val (as a temporary register) */,
+                      $tmp1$$Register   /* tmp1 */,
+                      $tmp2$$Register   /* tmp2 */,
+                      RegSet::of($mem$$Register, $preval$$Register, $newval$$Register) /* preserve */);
     __ atomic_xchgal($preval$$Register, $newval$$Register, $mem$$Register);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register    /* store_addr */,
-                          $newval$$Register /* new_val */,
-                          $tmp1$$Register   /* tmp1 */,
-                          $tmp2$$Register   /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register    /* store_addr */,
+                       $newval$$Register /* new_val */,
+                       $tmp1$$Register   /* tmp1 */,
+                       $tmp2$$Register   /* tmp2 */);
   %}
   ins_pipe(pipe_serial);
 %}
@@ -488,19 +488,19 @@ instruct g1XChgN(indirect mem, iRegN newval, iRegPNoSp tmp1, iRegPNoSp tmp2, iRe
   ins_encode %{
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($mem$$Register, $newval$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $preval$$Register, $newval$$Register) /* preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $preval$$Register, $newval$$Register) /* preserve */);
     __ atomic_xchgwu($preval$$Register, $newval$$Register, $mem$$Register);
     __ decode_heap_oop($tmp1$$Register, $newval$$Register);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $tmp1$$Register /* new_val */,
-                          $tmp2$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $tmp1$$Register /* new_val */,
+                       $tmp2$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(pipe_serial);
 %}
@@ -515,19 +515,19 @@ instruct g1XChgNAcq(indirect mem, iRegN newval, iRegPNoSp tmp1, iRegPNoSp tmp2, 
   ins_encode %{
     guarantee($mem$$disp == 0, "impossible encoding");
     assert_different_registers($mem$$Register, $newval$$Register);
-    g1_pre_write_barrier(masm, this,
-                         $mem$$Register  /* obj */,
-                         $tmp1$$Register /* pre_val */,
-                         $tmp2$$Register /* tmp1 */,
-                         $tmp3$$Register /* tmp2 */,
-                         RegSet::of($mem$$Register, $preval$$Register, $newval$$Register) /* preserve */);
+    write_barrier_pre(masm, this,
+                      $mem$$Register  /* obj */,
+                      $tmp1$$Register /* pre_val */,
+                      $tmp2$$Register /* tmp1 */,
+                      $tmp3$$Register /* tmp2 */,
+                      RegSet::of($mem$$Register, $preval$$Register, $newval$$Register) /* preserve */);
     __ atomic_xchgalwu($preval$$Register, $newval$$Register, $mem$$Register);
     __ decode_heap_oop($tmp1$$Register, $newval$$Register);
-    g1_post_write_barrier(masm, this,
-                          $mem$$Register  /* store_addr */,
-                          $tmp1$$Register /* new_val */,
-                          $tmp2$$Register /* tmp1 */,
-                          $tmp3$$Register /* tmp2 */);
+    write_barrier_post(masm, this,
+                       $mem$$Register  /* store_addr */,
+                       $tmp1$$Register /* new_val */,
+                       $tmp2$$Register /* tmp1 */,
+                       $tmp3$$Register /* tmp2 */);
   %}
   ins_pipe(pipe_serial);
 %}
@@ -542,11 +542,11 @@ instruct g1LoadP(iRegPNoSp dst, indirect mem, iRegPNoSp tmp1, iRegPNoSp tmp2)
   ins_encode %{
     guarantee($mem$$disp == 0, "impossible encoding");
     __ ld($dst$$Register, Address($mem$$Register));
-    g1_pre_write_barrier(masm, this,
-                         noreg /* obj */,
-                         $dst$$Register /* pre_val */,
-                         $tmp1$$Register /* tmp1 */,
-                         $tmp2$$Register /* tmp2 */);
+    write_barrier_pre(masm, this,
+                      noreg /* obj */,
+                      $dst$$Register /* pre_val */,
+                      $tmp1$$Register /* tmp1 */,
+                      $tmp2$$Register /* tmp2 */);
   %}
   ins_pipe(iload_reg_mem);
 %}
@@ -563,11 +563,11 @@ instruct g1LoadN(iRegNNoSp dst, indirect mem, iRegPNoSp tmp1, iRegPNoSp tmp2, iR
     __ lwu($dst$$Register, Address($mem$$Register));
     if ((barrier_data() & G1C2BarrierPre) != 0) {
       __ decode_heap_oop($tmp1$$Register, $dst$$Register);
-      g1_pre_write_barrier(masm, this,
-                           noreg /* obj */,
-                           $tmp1$$Register /* pre_val */,
-                           $tmp2$$Register /* tmp1 */,
-                           $tmp3$$Register /* tmp2 */);
+      write_barrier_pre(masm, this,
+                        noreg /* obj */,
+                        $tmp1$$Register /* pre_val */,
+                        $tmp2$$Register /* tmp1 */,
+                        $tmp3$$Register /* tmp2 */);
     }
   %}
   ins_pipe(iload_reg_mem);
