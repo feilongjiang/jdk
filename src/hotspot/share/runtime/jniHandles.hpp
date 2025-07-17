@@ -140,7 +140,7 @@ class JNIHandleBlock : public CHeapObj<mtInternal> {
 
  private:
   enum SomeConstants {
-    block_size_in_oops  = 32                    // Number of handles per handle block
+    block_size_in_oops  = 128                   // Number of handles per handle block
   };
 
   uintptr_t       _handles[block_size_in_oops]; // The handles
@@ -155,6 +155,8 @@ class JNIHandleBlock : public CHeapObj<mtInternal> {
   uintptr_t*      _free_list;                   // Handle free list
 
   static int      _blocks_allocated;            // For debugging/printing
+
+  static JNIHandleBlock* _custom_block; // Custom handle block for CompilerOracle::should_use_custom_handle
 
   // Fill block with bad_handle values
   void zap() NOT_DEBUG_RETURN;
@@ -172,6 +174,9 @@ class JNIHandleBlock : public CHeapObj<mtInternal> {
   // Block allocation and block free list management
   static JNIHandleBlock* allocate_block(JavaThread* thread = nullptr, AllocFailType alloc_failmode = AllocFailStrategy::EXIT_OOM);
   static void release_block(JNIHandleBlock* block, JavaThread* thread = nullptr);
+
+  static JNIHandleBlock* get_custom_block(JavaThread* thread);
+  static void init_custom_block(JavaThread* thread);
 
   // JNI PushLocalFrame/PopLocalFrame support
   JNIHandleBlock* pop_frame_link() const          { return _pop_frame_link; }

@@ -37,6 +37,8 @@
 #include "utilities/align.hpp"
 #include "utilities/debug.hpp"
 
+#include <sys/mman.h>
+
 OopStorage* JNIHandles::global_handles() {
   return _global_handles;
 }
@@ -283,6 +285,7 @@ bool JNIHandles::current_thread_in_native() {
 }
 
 int JNIHandleBlock::_blocks_allocated = 0;
+JNIHandleBlock* JNIHandleBlock::_custom_block = nullptr;
 
 static inline bool is_tagged_free_list(uintptr_t value) {
   return (value & 1u) != 0;
@@ -314,6 +317,48 @@ void JNIHandleBlock::zap() {
   }
 }
 #endif // ASSERT
+
+JNIHandleBlock* JNIHandleBlock::get_custom_block(JavaThread* thread) {
+  if (_custom_block == nullptr) {
+    // Allocate a custom block if it does not exist yet.
+    init_custom_block(thread);
+    if (_custom_block == nullptr) {
+      // Allocation failed, return nullptr.
+      return nullptr;
+    }
+  }
+  return _custom_block;
+}
+
+void JNIHandleBlock::init_custom_block(JavaThread* thread) {
+  assert(_custom_block == nullptr, "custom block already initialized");
+  // Allocate a custom handle block for CompilerOracle::should_use_custom_handle.
+  void* byte_map_base_addr = (void*)((CardTableBarrierSet*)(BarrierSet::barrier_set()))->card_table()->byte_map_base();
+  const int PAGE_SIZE = os::vm_page_size();
+  tty->print_cr("[Custom Handle Init] page size: %d", PAGE_SIZE);
+  void* addr = (void*)((char*)byte_map_base_addr - PAGE_SIZE);
+  void* ptr = mmap(
+    addr,
+    2 * PAGE_SIZE,
+    PROT_READ | PROT_WRITE,
+    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
+    -1, 0
+  );
+  if (ptr != MAP_FAILED) {
+    tty->print_cr("[Custom Handle Init] mmap " INTPTR_FORMAT ", " INTPTR_FORMAT "] success!!!", (uintptr_t)addr, (uintptr_t)addr + 2 * PAGE_SIZE);
+    tty->print_cr("[Custom Handle Init] sizeof(JNIHandleBlock: %ld)", sizeof(JNIHandleBlock));
+    tty->print_cr("[Custom Handle Init] JNIHandleAllocOffset: %d", JNIHandleBlockAllocOffset);
+    void* alloc_addr = (void*)((char*)addr + PAGE_SIZE - JNIHandleBlockAllocOffset);
+    _custom_block = (JNIHandleBlock*)alloc_addr;
+    tty->print_cr("[Custom Handle Init] custom handle block: " INTPTR_FORMAT ", byte_map_base: " INTPTR_FORMAT, (uintptr_t)_custom_block, (uintptr_t)byte_map_base_addr);
+    _custom_block->_top = 0;
+    _custom_block->_next = nullptr;
+    _custom_block->_pop_frame_link = nullptr;
+  } else {
+    tty->print_cr("[Custom Handle Init] mmap " INTPTR_FORMAT ", " INTPTR_FORMAT "] failed!!!", (uintptr_t)addr, (uintptr_t)addr + 2 * PAGE_SIZE);
+    ShouldNotReachHere();
+  }
+}
 
 JNIHandleBlock* JNIHandleBlock::allocate_block(JavaThread* thread, AllocFailType alloc_failmode)  {
   // The VM thread can allocate a handle block in behalf of another thread during a safepoint.
@@ -449,7 +494,12 @@ jobject JNIHandleBlock::allocate_handle(JavaThread* caller, oop obj, AllocFailTy
   // Try last block
   if (_last->_top < block_size_in_oops) {
     oop* handle = (oop*)&(_last->_handles)[_last->_top++];
+    void* byte_map_base_addr = (void*)((CardTableBarrierSet*)(BarrierSet::barrier_set()))->card_table()->byte_map_base();
+    if ((char*)handle == byte_map_base_addr) {
+      tty->print_cr("[Custom Handle] allocate handle at byte_map_base: " INTPTR_FORMAT " oop: " INTPTR_FORMAT, (uintptr_t)handle, p2i(obj));
+    }
     *handle = obj;
+
     return (jobject) handle;
   }
 
@@ -457,6 +507,10 @@ jobject JNIHandleBlock::allocate_handle(JavaThread* caller, oop obj, AllocFailTy
   if (_free_list != nullptr) {
     oop* handle = (oop*)_free_list;
     _free_list = (uintptr_t*) untag_free_list(*_free_list);
+    void* byte_map_base_addr = (void*)((CardTableBarrierSet*)(BarrierSet::barrier_set()))->card_table()->byte_map_base();
+    if ((char*)handle == byte_map_base_addr) {
+      tty->print_cr("[Custom Handle] allocate handle at byte_map_base: " INTPTR_FORMAT " oop: " INTPTR_FORMAT, (uintptr_t)handle, p2i(obj));
+    }
     *handle = obj;
     return (jobject) handle;
   }

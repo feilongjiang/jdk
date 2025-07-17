@@ -307,7 +307,8 @@
                                                                             \
   product(ccstrlist, CompileOnly, "",                                       \
           "List of methods (pkg/class.name) to restrict compilation to")    \
-                                                                            \
+  product(ccstrlist, CustomHandle, "",                                      \
+          "List of methods (pkg/class.name) to restrict compilation to")    \
   product(ccstr, CompileCommandFile, nullptr,                               \
           "Read compiler commands from this file [.hotspot_compiler]")      \
                                                                             \

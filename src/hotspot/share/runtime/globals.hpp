@@ -2003,6 +2003,9 @@ const int ObjectAlignmentInBytes = 8;
   develop(uint, BinarySearchThreshold, 16,                                  \
           "Minimal number of elements in a sorted collection to prefer"     \
           "binary search over simple linear search." )                      \
+  product(uint, JNIHandleBlockAllocOffset, 0,                               \
+          "Allocate JNIHandles at custom block with offset, default (0)"    \
+          "will allocate the first JNIHandle at byte_map_base." )           \
 
 // end of RUNTIME_FLAGS
 

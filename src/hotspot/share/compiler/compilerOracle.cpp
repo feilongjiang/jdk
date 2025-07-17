@@ -472,6 +472,13 @@ bool CompilerOracle::should_exclude(const methodHandle& method) {
   return false;
 }
 
+bool CompilerOracle::should_use_custom_handle(const methodHandle& method) {
+  if (has_command(CompileCommandEnum::CustomHandle)) {
+    return check_predicate(CompileCommandEnum::CustomHandle, method);
+  }
+  return false;
+}
+
 bool CompilerOracle::should_inline(const methodHandle& method) {
   return (check_predicate(CompileCommandEnum::Inline, method));
 }
@@ -1143,6 +1150,9 @@ bool compilerOracle_init() {
   if (!CompilerOracle::parse_from_string(CompileOnly, CompilerOracle::parse_compile_only)) {
     success = false;
   }
+  if (!CompilerOracle::parse_from_string(CustomHandle, CompilerOracle::parse_custom_handle)) {
+    success = false;
+  }
   if (CompilerOracle::has_command_file()) {
     if (!CompilerOracle::parse_from_file()) {
       success = false;
@@ -1186,6 +1196,38 @@ bool CompilerOracle::parse_compile_only(char* line) {
     }
     ttyLocker ttyl;
     tty->print_cr("CompileOnly: An error occurred during parsing");
+    if (*error_buf != '\0') {
+      tty->print_cr("Error: %s", error_buf);
+    }
+    tty->print_cr("Line: '%s'", original.get());
+    return false;
+  } while (method_pattern != nullptr && line != nullptr);
+  return true;
+}
+
+bool CompilerOracle::parse_custom_handle(char* line) {
+  if (line[0] == '\0') {
+    return true;
+  }
+  ResourceMark rm;
+  char error_buf[1024] = {0};
+  LineCopy original(line);
+  char* method_pattern;
+  do {
+    if (line[0] == '\0') {
+      break;
+    }
+    method_pattern = strtok_r(line, ",", &line);
+    if (method_pattern != nullptr) {
+      TypedMethodOptionMatcher* matcher = TypedMethodOptionMatcher::parse_method_pattern(method_pattern, error_buf, sizeof(error_buf));
+      if (matcher != nullptr) {
+        if (register_command(matcher, CompileCommandEnum::CustomHandle, error_buf, sizeof(error_buf), true)) {
+          continue;
+        }
+      }
+    }
+    ttyLocker ttyl;
+    tty->print_cr("CustomHandle: An error occurred during parsing");
     if (*error_buf != '\0') {
       tty->print_cr("Error: %s", error_buf);
     }

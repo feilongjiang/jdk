@@ -213,6 +213,9 @@ class JavaThread: public Thread {
   void push_jni_handle_block();
   void pop_jni_handle_block();
 
+  void push_custom_jni_handle_block();
+  void pop_custom_jni_handle_block();
+
  private:
   enum SuspendFlags {
     // NOTE: avoid using the sign-bit as cc generates different test code
@@ -1341,11 +1344,22 @@ class UnlockFlagSaver {
 
 class JNIHandleMark : public StackObj {
   JavaThread* _thread;
+  bool _customHandle;
  public:
-  JNIHandleMark(JavaThread* thread) : _thread(thread) {
-    thread->push_jni_handle_block();
+  JNIHandleMark(JavaThread* thread, bool customHandle = false) : _thread(thread), _customHandle(customHandle) {
+    if (_customHandle) {
+      thread->push_custom_jni_handle_block();
+    } else {
+      thread->push_jni_handle_block();
+    }
   }
-  ~JNIHandleMark() { _thread->pop_jni_handle_block(); }
+  ~JNIHandleMark() {
+    if (_customHandle) {
+      _thread->pop_custom_jni_handle_block();
+    } else {
+      _thread->pop_jni_handle_block();
+    }
+  }
 };
 
 class NoPreemptMark {

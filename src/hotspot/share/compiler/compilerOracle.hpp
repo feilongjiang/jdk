@@ -54,6 +54,7 @@ class methodHandle;
   option(DontInline,  "dontinline", Bool) \
   option(Blackhole,  "blackhole", Bool) \
   option(CompileOnly, "compileonly", Bool)\
+  option(CustomHandle, "customhandle", Bool)\
   option(Exclude, "exclude", Bool) \
   option(Break, "break", Bool) \
   option(BreakAtExecute, "BreakAtExecute", Bool) \
@@ -144,6 +145,8 @@ class CompilerOracle : AllStatic {
   static bool should_exclude(const methodHandle& method);
   static bool be_quiet() { return _quiet; }
 
+  static bool should_use_custom_handle(const methodHandle& method);
+
   // Tells whether we want to inline this method
   static bool should_inline(const methodHandle& method);
 
@@ -189,6 +192,7 @@ class CompilerOracle : AllStatic {
   static bool parse_from_line(char* line);
   static bool parse_from_line_quietly(char* line);
   static bool parse_compile_only(char* line);
+  static bool parse_custom_handle(char* line);
 
   // Fast check if there is any option set that compile control needs to know about
   static bool has_any_command_set();

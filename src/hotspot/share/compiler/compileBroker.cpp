@@ -2215,7 +2215,8 @@ void CompileBroker::invoke_compiler_on_method(CompileTask* task) {
   }
 
   // Allocate a new set of JNI handles.
-  JNIHandleMark jhm(thread);
+  methodHandle md(thread, task->method());
+  JNIHandleMark jhm(thread, CompilerOracle::should_use_custom_handle(md));
   Method* target_handle = task->method();
   int compilable = ciEnv::MethodCompilable;
   const char* failure_reason = nullptr;
