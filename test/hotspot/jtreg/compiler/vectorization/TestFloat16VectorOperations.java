@@ -457,7 +457,7 @@ public class TestFloat16VectorOperations {
     @Test
     @Warmup(50)
     @IR(counts = {IRNode.ADD_REDUCTION_VHF, " >0 "},
-        applyIfCPUFeature = {"sve", "true"})
+        applyIfCPUFeatureOr = {"sve", "true", "zvfh", "true"})
     @IR(counts = {IRNode.ADD_REDUCTION_VHF, " >0 "},
         applyIfCPUFeatureAnd = {"fphp", "true", "asimdhp", "true"})
     public short vectorAddReductionFloat16() {
