@@ -103,7 +103,10 @@ void G1BarrierSetAssembler::gen_write_ref_array_post_barrier(MacroAssembler* mas
   // end within a card, we need to calculate this via the card table indexes of
   // the actual start and last addresses covered by the object.
   // Temporarily use the count register for the last element address.
-  __ shadd(count, count, start, tmp, LogBytesPerHeapOop); // end = start + count << LogBytesPerHeapOop
+  // __ shadd(count, count, start, tmp, LogBytesPerHeapOop); // end = start + count << LogBytesPerHeapOop
+  // end = start + count << LogBytesPerHeapOop
+  __ slli(tmp, count, LogBytesPerHeapOop);
+  __ add(count, tmp, start);
   __ subi(count, count, BytesPerHeapOop);                 // Use last element address for end.
 
   __ srli(start, start, CardTable::card_shift());

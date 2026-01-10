@@ -97,7 +97,9 @@ class InterpreterMacroAssembler: public MacroAssembler {
 
   void restore_locals() {
     ld(xlocals, Address(fp, frame::interpreter_frame_locals_offset * wordSize));
-    shadd(xlocals, xlocals, fp, t0, LogBytesPerWord);
+    // shadd(xlocals, xlocals, fp, t0, LogBytesPerWord);
+    slli(t0, xlocals, LogBytesPerWord);
+    add(xlocals, t0, fp);
   }
 
   void restore_constant_pool_cache() {
@@ -107,7 +109,9 @@ class InterpreterMacroAssembler: public MacroAssembler {
   void restore_sp_after_call() {
     Label L;
     ld(t0, Address(fp, frame::interpreter_frame_extended_sp_offset * wordSize));
-    shadd(t0, t0, fp, t0, LogBytesPerWord);
+    // shadd(t0, t0, fp, t0, LogBytesPerWord);
+    slli(t0, t0, LogBytesPerWord);
+    add(t0, t0, fp);
 #ifdef ASSERT
     bnez(t0, L);
     stop("SP is null");
@@ -120,7 +124,9 @@ class InterpreterMacroAssembler: public MacroAssembler {
 #ifdef ASSERT
     Label L;
     ld(t0, Address(fp, frame::interpreter_frame_extended_sp_offset * wordSize));
-    shadd(t0, t0, fp, t0, LogBytesPerWord);
+    // shadd(t0, t0, fp, t0, LogBytesPerWord);
+    slli(t0, t0, LogBytesPerWord);
+    add(t0, t0, fp);
     beq(sp, t0, L);
     stop(msg);
     bind(L);
@@ -183,7 +189,9 @@ class InterpreterMacroAssembler: public MacroAssembler {
 
   void empty_expression_stack() {
     ld(t0, Address(fp, frame::interpreter_frame_monitor_block_top_offset * wordSize));
-    shadd(esp, t0, fp, t0, LogBytesPerWord);
+    // shadd(esp, t0, fp, t0, LogBytesPerWord);
+    slli(t0, t0, LogBytesPerWord);
+    add(esp, t0, fp);
     // null last_sp until next java call
     sd(zr, Address(fp, frame::interpreter_frame_last_sp_offset * wordSize));
   }

@@ -220,7 +220,9 @@ void C1_MacroAssembler::allocate_array(Register obj, Register len, Register tmp1
   const Register arr_size = tmp2; // okay to be the same
   // align object end
   mv(arr_size, (int32_t)base_offset_in_bytes + MinObjAlignmentInBytesMask);
-  shadd(arr_size, len, arr_size, t0, f);
+  // shadd(arr_size, len, arr_size, t0, f);
+  slli(t0, len, f);
+  add(arr_size, t0, arr_size);
   andi(arr_size, arr_size, ~MinObjAlignmentInBytesMask);
 
   try_allocate(obj, arr_size, 0, tmp1, tmp2, slow_case);

@@ -956,7 +956,6 @@ public:
     Assembler::NAME(Rd, Rs1, Rs2);                               \
   }
 
-  INSN(add);
   INSN(addw);
   INSN(sub);
   INSN(subw);
@@ -1429,6 +1428,13 @@ public:
   void zero_memory(Register addr, Register len, Register tmp);
   void zero_dcache_blocks(Register base, Register cnt, Register tmp1, Register tmp2);
 
+  bool shadd_can_merge(Register Rd, Register Rs1, Register Rs2);
+  bool try_merge_shadd(Register Rd, Register Rs1, Register Rs2);
+  void merge_shadd(Register Rd, Register Rs1, Register Rs2);
+
+  using Assembler::add;
+  void add(Register Rd, Register Rs1, Register Rs2);
+
   // shift left by shamt and add
   void shadd(Register Rd, Register Rs1, Register Rs2, Register tmp, int shamt);
 
@@ -1704,6 +1710,11 @@ public:
   static bool is_movptr2_at(address instr);
 
   static bool is_lwu_to_zr(address instr);
+
+  static bool is_shadd_shamt_at(address instr) {
+    assert_cond(instr != nullptr);
+    return is_slli_shift_at(instr, 1) || is_slli_shift_at(instr, 2) || is_slli_shift_at(instr, 3);
+  }
 
   static Register extract_rs1(address instr);
   static Register extract_rs2(address instr);

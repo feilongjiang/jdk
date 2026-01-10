@@ -3671,6 +3671,7 @@ public:
     }                                                                                        \
     if (shamt != 0) {                                                                        \
       _slli(Rd, Rs1, shamt);                                                                 \
+      code()->set_last_insn(pc());                                                           \
     } else {                                                                                 \
       if (Rd != Rs1) {                                                                       \
         addi(Rd, Rs1, 0);                                                                    \

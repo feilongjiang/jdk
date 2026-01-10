@@ -291,11 +291,13 @@ instruct shaddP_reg_reg_b(iRegPNoSp dst, iRegP src1, iRegL src2, immIScale imm) 
   format %{ "shadd  $dst, $src2, $src1, $imm\t# ptr, #@shaddP_reg_reg_b" %}
 
   ins_encode %{
-    __ shadd(as_Register($dst$$reg),
-             as_Register($src2$$reg),
-             as_Register($src1$$reg),
-             t0,
-             $imm$$constant);
+    // __ shadd(as_Register($dst$$reg),
+    //          as_Register($src2$$reg),
+    //          as_Register($src1$$reg),
+    //          t0,
+    //          $imm$$constant);
+    __ slli(t0, as_Register($src2$$reg), $imm$$constant);
+    __ add(as_Register($dst$$reg), t0, as_Register($src1$$reg));
   %}
 
   ins_pipe(ialu_reg_reg);
@@ -309,11 +311,13 @@ instruct shaddP_reg_reg_ext_b(iRegPNoSp dst, iRegP src1, iRegI src2, immIScale i
   format %{ "shadd  $dst, $src2, $src1, $imm\t# ptr, #@shaddP_reg_reg_ext_b" %}
 
   ins_encode %{
-    __ shadd(as_Register($dst$$reg),
-             as_Register($src2$$reg),
-             as_Register($src1$$reg),
-             t0,
-             $imm$$constant);
+    // __ shadd(as_Register($dst$$reg),
+    //          as_Register($src2$$reg),
+    //          as_Register($src1$$reg),
+    //          t0,
+    //          $imm$$constant);
+    __ slli(t0, as_Register($src2$$reg), $imm$$constant);
+    __ add(as_Register($dst$$reg), t0, as_Register($src1$$reg));
   %}
 
   ins_pipe(ialu_reg_reg);
@@ -328,11 +332,13 @@ instruct shaddL_reg_reg_b(iRegLNoSp dst, iRegL src1, iRegL src2, immIScale imm) 
   format %{ "shadd  $dst, $src2, $src1, $imm\t#@shaddL_reg_reg_b" %}
 
   ins_encode %{
-    __ shadd(as_Register($dst$$reg),
-             as_Register($src2$$reg),
-             as_Register($src1$$reg),
-             t0,
-             $imm$$constant);
+    // __ shadd(as_Register($dst$$reg),
+    //          as_Register($src2$$reg),
+    //          as_Register($src1$$reg),
+    //          t0,
+    //          $imm$$constant);
+    __ slli(t0, as_Register($src2$$reg), $imm$$constant);
+    __ add(as_Register($dst$$reg), t0, as_Register($src1$$reg));
   %}
 
   ins_pipe(ialu_reg_reg);
@@ -346,11 +352,13 @@ instruct shaddL_reg_reg_ext_b(iRegLNoSp dst, iRegL src1, iRegI src2, immIScale i
   format %{ "shadd  $dst, $src2, $src1, $imm\t#@shaddL_reg_reg_ext_b" %}
 
   ins_encode %{
-    __ shadd(as_Register($dst$$reg),
-             as_Register($src2$$reg),
-             as_Register($src1$$reg),
-             t0,
-             $imm$$constant);
+    // __ shadd(as_Register($dst$$reg),
+    //          as_Register($src2$$reg),
+    //          as_Register($src1$$reg),
+    //          t0,
+    //          $imm$$constant);
+    __ slli(t0, as_Register($src2$$reg), $imm$$constant);
+    __ add(as_Register($dst$$reg), t0, as_Register($src1$$reg));
   %}
 
   ins_pipe(ialu_reg_reg);

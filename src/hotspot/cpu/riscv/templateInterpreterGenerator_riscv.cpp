@@ -332,7 +332,9 @@ address TemplateInterpreterGenerator::generate_StackOverflowError_handler() {
   {
     Label L;
     __ ld(t0, Address(fp, frame::interpreter_frame_monitor_block_top_offset * wordSize));
-    __ shadd(t0, t0, fp, t0, LogBytesPerWord);
+    // __ shadd(t0, t0, fp, t0, LogBytesPerWord);
+    __ slli(t0, t0, LogBytesPerWord);
+    __ add(t0, t0, fp);
     // maximal sp for current fp (stack grows negative)
     // check if frame is complete
     __ bge(t0, sp, L);
@@ -429,7 +431,9 @@ address TemplateInterpreterGenerator::generate_return_entry_for(TosState state, 
 
   // Restore stack bottom in case i2c adjusted stack
   __ ld(t0, Address(fp, frame::interpreter_frame_last_sp_offset * wordSize));
-  __ shadd(esp, t0, fp,  t0,  LogBytesPerWord);
+  // __ shadd(esp, t0, fp,  t0,  LogBytesPerWord);
+  __ slli(t0, t0, LogBytesPerWord);
+  __ add(esp, t0, fp);
   // and null it as marker that esp is now tos until next java call
   __ sd(zr, Address(fp, frame::interpreter_frame_last_sp_offset * wordSize));
   __ restore_bcp();
@@ -451,14 +455,18 @@ address TemplateInterpreterGenerator::generate_return_entry_for(TosState state, 
   if (index_size == sizeof(u4)) {
     __ load_resolved_indy_entry(cache, index);
     __ load_unsigned_short(cache, Address(cache, in_bytes(ResolvedIndyEntry::num_parameters_offset())));
-    __ shadd(esp, cache, esp, t0, 3);
+    // __ shadd(esp, cache, esp, t0, 3);
+    __ slli(t0, cache, 3);
+    __ add(esp, t0, esp);
   } else {
     // Pop N words from the stack
     assert(index_size == sizeof(u2), "Can only be u2");
     __ load_method_entry(cache, index);
     __ load_unsigned_short(cache, Address(cache, in_bytes(ResolvedMethodEntry::num_parameters_offset())));
 
-    __ shadd(esp, cache, esp, t0, 3);
+    // __ shadd(esp, cache, esp, t0, 3);
+    __ slli(t0, cache, 3);
+    __ add(esp, t0, esp);
   }
 
   // Restore machine SP
@@ -487,7 +495,9 @@ address TemplateInterpreterGenerator::generate_deopt_entry_for(TosState state,
 
   // Restore expression stack pointer
   __ ld(t0, Address(fp, frame::interpreter_frame_last_sp_offset * wordSize));
-  __ shadd(esp, t0, fp,  t0,  LogBytesPerWord);
+  // __ shadd(esp, t0, fp,  t0,  LogBytesPerWord);
+  __ slli(t0, t0, LogBytesPerWord);
+  __ add(esp, t0, fp);
   // null last_sp until next java call
   __ sd(zr, Address(fp, frame::interpreter_frame_last_sp_offset * wordSize));
 
@@ -550,13 +560,17 @@ address TemplateInterpreterGenerator::generate_cont_resume_interpreter_adapter()
 
   // Restore Java expression stack pointer
   __ ld(t0, Address(fp, frame::interpreter_frame_last_sp_offset * wordSize));
-  __ shadd(esp, t0, fp, t0, Interpreter::logStackElementSize);
+  // __ shadd(esp, t0, fp, t0, Interpreter::logStackElementSize);
+  __ slli(t0, t0, Interpreter::logStackElementSize);
+  __ add(esp, t0, fp);
   // and null it as marker that esp is now tos until next java call
   __ sd(zr, Address(fp, frame::interpreter_frame_last_sp_offset * wordSize));
 
   // Restore machine SP
   __ ld(t0, Address(fp, frame::interpreter_frame_extended_sp_offset * wordSize));
-  __ shadd(sp, t0, fp, t0, LogBytesPerWord);
+  // __ shadd(sp, t0, fp, t0, LogBytesPerWord);
+  __ slli(t0, t0, LogBytesPerWord);
+  __ add(sp, t0, fp);
 
   // Restore method
   __ ld(xmethod, Address(fp, frame::interpreter_frame_method_offset * wordSize));
@@ -660,7 +674,10 @@ void TemplateInterpreterGenerator::generate_stack_overflow_check(void) {
 
   // locals + overhead, in bytes
   __ mv(x10, overhead_size);
-  __ shadd(x10, x13, x10, t0, Interpreter::logStackElementSize);  // 2 slots per parameter.
+  // __ shadd(x10, x13, x10, t0, Interpreter::logStackElementSize);  // 2 slots per parameter.
+  // 2 slots per parameter.
+  __ slli(t0, x13, Interpreter::logStackElementSize);
+  __ add(x10, t0, x10);
 
   const Address stack_limit(xthread, JavaThread::stack_overflow_limit_offset());
   __ ld(t0, stack_limit);
@@ -1018,7 +1035,9 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   // for natives the size of locals is zero
 
   // compute beginning of parameters (xlocals)
-  __ shadd(xlocals, x12, esp, xlocals, 3);
+  // __ shadd(xlocals, x12, esp, xlocals, 3);
+  __ slli(xlocals, x12, 3);
+  __ add(xlocals, xlocals, esp);
   __ subi(xlocals, xlocals, wordSize);
 
   // Pull SP back to minimum size: this avoids holes in the stack
@@ -1451,7 +1470,9 @@ address TemplateInterpreterGenerator::generate_normal_entry(bool synchronized) {
   generate_stack_overflow_check();
 
   // compute beginning of parameters (xlocals)
-  __ shadd(xlocals, x12, esp, t1, 3);
+  // __ shadd(xlocals, x12, esp, t1, 3);
+  __ slli(t1, x12, 3);
+  __ add(xlocals, t1, esp);
   __ subi(xlocals, xlocals, wordSize);
 
   // Make room for additional locals
@@ -1691,7 +1712,9 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
 
   // Restore the last_sp and null it out
   __ ld(t0, Address(fp, frame::interpreter_frame_last_sp_offset * wordSize));
-  __ shadd(esp, t0, fp,  t0,  LogBytesPerWord);
+  // __ shadd(esp, t0, fp,  t0,  LogBytesPerWord);
+  __ slli(t0, t0, LogBytesPerWord);
+  __ add(esp, t0, fp);
   __ sd(zr, Address(fp, frame::interpreter_frame_last_sp_offset * wordSize));
 
   __ restore_bcp();
@@ -1882,7 +1905,9 @@ void TemplateInterpreterGenerator::histogram_bytecode_pair(Template* t) {
   //   _counters[_index] ++;
   Register counter_addr = t1;
   __ mv(x7, (address) &BytecodePairHistogram::_counters);
-  __ shadd(counter_addr, index, x7, counter_addr, LogBytesPerInt);
+  // __ shadd(counter_addr, index, x7, counter_addr, LogBytesPerInt);
+  __ slli(counter_addr, index, LogBytesPerInt);
+  __ add(counter_addr, counter_addr, x7);
   __ atomic_addw(noreg, 1, counter_addr);
  }
 

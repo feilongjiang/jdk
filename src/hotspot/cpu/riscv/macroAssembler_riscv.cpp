@@ -596,7 +596,9 @@ Address MacroAssembler::argument_address(RegisterOrConstant arg_slot,
     return Address(esp, arg_slot.as_constant() * stackElementSize + offset);
   } else {
     assert_different_registers(t0, arg_slot.as_register());
-    shadd(t0, arg_slot.as_register(), esp, t0, exact_log2(stackElementSize));
+    // shadd(t0, arg_slot.as_register(), esp, t0, exact_log2(stackElementSize));
+    slli(t0, arg_slot.as_register(), exact_log2(stackElementSize));
+    add(t0, t0, esp);
     return Address(t0, offset);
   }
 }
@@ -1918,7 +1920,9 @@ void MacroAssembler::update_byte_crc32(Register crc, Register val, Register tabl
 
   xorr(val, val, crc);
   zext(val, val, 8);
-  shadd(val, val, table, val, 2);
+  // shadd(val, val, table, val, 2);
+  slli(val, val, 2);
+  add(val, val, table);
   lwu(val, Address(val));
   srli(crc, crc, 8);
   xorr(crc, val, crc);
@@ -1948,7 +1952,9 @@ void MacroAssembler::update_word_crc32(Register crc, Register v, Register tmp1, 
   xorr(v, v, crc);
 
   zext(tmp1, v, 8);
-  shadd(tmp1, tmp1, table3, tmp2, 2);
+  // shadd(tmp1, tmp1, table3, tmp2, 2);
+  slli(tmp2, tmp1, 2);
+  add(tmp1, tmp2, table3);
   lwu(crc, Address(tmp1));
 
   slli(tmp1, v, 16);
@@ -1957,10 +1963,14 @@ void MacroAssembler::update_word_crc32(Register crc, Register v, Register tmp1, 
   srliw(tmp1, tmp1, 24);
   srliw(tmp3, tmp3, 24);
 
-  shadd(tmp1, tmp1, table2, tmp1, 2);
+  // shadd(tmp1, tmp1, table2, tmp1, 2);
+  slli(tmp1, tmp1, 2);
+  add(tmp1, tmp1, table2);
   lwu(tmp2, Address(tmp1));
 
-  shadd(tmp3, tmp3, table1, tmp3, 2);
+  // shadd(tmp3, tmp3, table1, tmp3, 2);
+  slli(tmp3, tmp3, 2);
+  add(tmp3, tmp3, table1);
   xorr(crc, crc, tmp2);
 
   lwu(tmp2, Address(tmp3));
@@ -1971,7 +1981,9 @@ void MacroAssembler::update_word_crc32(Register crc, Register v, Register tmp1, 
     srliw(tmp1, v, 24);
 
   // no need to clear bits other than lowest two
-  shadd(tmp1, tmp1, table0, tmp1, 2);
+  // shadd(tmp1, tmp1, table0, tmp1, 2);
+  slli(tmp1, tmp1, 2);
+  add(tmp1, tmp1, table0);
   xorr(crc, crc, tmp2);
   lwu(tmp2, Address(tmp1));
   xorr(crc, crc, tmp2);
@@ -2065,7 +2077,9 @@ void MacroAssembler::vector_update_crc32(Register crc, Register buf, Register le
         xorr(crc, crc, tmp2);
         for (int j = 0; j < W; j++) {
           andr(t1, crc, tmp5);
-          shadd(t1, t1, table0, tmp1, 2);
+          // shadd(t1, t1, table0, tmp1, 2);
+          slli(tmp1, t1, 2);
+          add(t1, tmp1, table0);
           lwu(t1, Address(t1, 0));
           srli(tmp2, crc, 8);
           xorr(crc, tmp2, t1);
@@ -3640,7 +3654,9 @@ void MacroAssembler::decode_klass_not_null(Register dst, Register src, Register 
 
   if (CompressedKlassPointers::shift() != 0) {
     // dst = (src << shift) + xbase
-    shadd(dst, src, xbase, dst /* temporary, dst != xbase */, CompressedKlassPointers::shift());
+    // shadd(dst, src, xbase, dst /* temporary, dst != xbase */, CompressedKlassPointers::shift());
+    slli(dst, src, CompressedKlassPointers::shift());
+    add(dst, dst, xbase);
   } else {
     add(dst, xbase, src);
   }
@@ -3713,7 +3729,9 @@ void  MacroAssembler::decode_heap_oop(Register d, Register s) {
     Label done;
     mv(d, s);
     beqz(s, done);
-    shadd(d, s, xheapbase, d, LogMinObjAlignmentInBytes);
+    // shadd(d, s, xheapbase, d, LogMinObjAlignmentInBytes);
+    slli(d, s, LogMinObjAlignmentInBytes);
+    add(d, d, xheapbase);
     bind(done);
   }
   verify_oop_msg(d, "broken oop in decode_heap_oop");
@@ -3768,7 +3786,9 @@ void MacroAssembler::lookup_interface_method(Register recv_klass,
   lwu(scan_tmp, Address(recv_klass, Klass::vtable_length_offset()));
 
   // Could store the aligned, prescaled offset in the klass.
-  shadd(scan_tmp, scan_tmp, recv_klass, scan_tmp, 3);
+  // shadd(scan_tmp, scan_tmp, recv_klass, scan_tmp, 3);
+  slli(scan_tmp, scan_tmp, 3);
+  add(scan_tmp, scan_tmp, recv_klass);
   add(scan_tmp, scan_tmp, vtable_base);
 
   if (return_method) {
@@ -3843,7 +3863,9 @@ void MacroAssembler::lookup_interface_method_stub(Register recv_klass,
   //                            + sizeof(vtableEntry) * (recv_klass->_vtable_len);
   // scan_temp = &(itable[0]._interface)
   // temp_itbl_klass = itable[0]._interface;
-  shadd(scan_temp, scan_temp, recv_klass, scan_temp, vte_scale);
+  // shadd(scan_temp, scan_temp, recv_klass, scan_temp, vte_scale);
+  slli(scan_temp, scan_temp, vte_scale);
+  add(scan_temp, scan_temp, recv_klass);
   ld(temp_itbl_klass, Address(scan_temp));
   mv(holder_offset, zr);
 
@@ -3921,7 +3943,9 @@ void MacroAssembler::lookup_virtual_method(Register recv_klass,
   int vtable_offset_in_bytes = in_bytes(base + vtableEntry::method_offset());
 
   if (vtable_index.is_register()) {
-    shadd(method_result, vtable_index.as_register(), recv_klass, method_result, LogBytesPerWord);
+    // shadd(method_result, vtable_index.as_register(), recv_klass, method_result, LogBytesPerWord);
+    slli(method_result, vtable_index.as_register(), LogBytesPerWord);
+    add(method_result, method_result, recv_klass);
     ld(method_result, Address(method_result, vtable_offset_in_bytes));
   } else {
     vtable_offset_in_bytes += vtable_index.as_constant() * wordSize;
@@ -4819,7 +4843,9 @@ bool MacroAssembler::lookup_secondary_supers_table_const(Register r_sub_klass,
   assert(Array<Klass*>::base_offset_in_bytes() == wordSize, "Adjust this code");
   assert(Array<Klass*>::length_offset_in_bytes() == 0, "Adjust this code");
 
-  shadd(result, r_array_index, r_array_base, result, LogBytesPerWord);
+  // shadd(result, r_array_index, r_array_base, result, LogBytesPerWord);
+  slli(result, r_array_index, LogBytesPerWord);
+  add(result, result, r_array_base);
   ld(result, Address(result));
   xorr(result, result, r_super_klass);
   beqz(result, L_fallthrough); // Found a match
@@ -4911,7 +4937,9 @@ void MacroAssembler::lookup_secondary_supers_table_var(Register r_sub_klass,
   // We will consult the secondary-super array.
   ld(r_array_base, Address(r_sub_klass, in_bytes(Klass::secondary_supers_offset())));
 
-  shadd(result, r_array_index, r_array_base, result, LogBytesPerWord);
+  // shadd(result, r_array_index, r_array_base, result, LogBytesPerWord);
+  slli(result, r_array_index, LogBytesPerWord);
+  add(result, result, r_array_base);
   ld(result, Address(result));
   xorr(result, result, r_super_klass);
   beqz(result, L_success ? *L_success : L_fallthrough); // Found a match
@@ -5001,7 +5029,9 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
     mv(r_array_index, zr);
     bind(skip);
 
-    shadd(t0, r_array_index, r_array_base, t0, LogBytesPerWord);
+    // shadd(t0, r_array_index, r_array_base, t0, LogBytesPerWord);
+    slli(t0, r_array_index, LogBytesPerWord);
+    add(t0, t0, r_array_base);
     ld(t0, Address(t0));
     beq(t0, r_super_klass, L_matched);
 
@@ -5580,7 +5610,9 @@ void MacroAssembler::multiply_64_x_64_loop(Register x, Register xstart, Register
   subiw(xstart, xstart, 1);
   bltz(xstart, L_one_x);
 
-  shadd(t0, xstart, x, t0, LogBytesPerInt);
+  // shadd(t0, xstart, x, t0, LogBytesPerInt);
+  slli(t0, xstart, LogBytesPerInt);
+  add(t0, t0, x);
   ld(x_xstart, Address(t0, 0));
   ror(x_xstart, x_xstart, 32); // convert big-endian to little-endian
 
@@ -5590,7 +5622,9 @@ void MacroAssembler::multiply_64_x_64_loop(Register x, Register xstart, Register
   subiw(idx, idx, 1);
   bltz(idx, L_one_y);
 
-  shadd(t0, idx, y, t0, LogBytesPerInt);
+  // shadd(t0, idx, y, t0, LogBytesPerInt);
+  slli(t0, idx, LogBytesPerInt);
+  add(t0, t0, y);
   ld(y_idx, Address(t0, 0));
   ror(y_idx, y_idx, 32); // convert big-endian to little-endian
   bind(L_multiply);
@@ -5602,7 +5636,9 @@ void MacroAssembler::multiply_64_x_64_loop(Register x, Register xstart, Register
 
   subiw(kdx, kdx, 2);
   ror(product, product, 32); // back to big-endian
-  shadd(t0, kdx, z, t0, LogBytesPerInt);
+  // shadd(t0, kdx, z, t0, LogBytesPerInt);
+  slli(t0, kdx, LogBytesPerInt);
+  add(t0, t0, z);
   sd(product, Address(t0, 0));
 
   j(L_first_loop);
@@ -5656,11 +5692,15 @@ void MacroAssembler::multiply_128_x_128_loop(Register y, Register z,
   bltz(jdx, L_third_loop_exit);
   subw(idx, idx, 4);
 
-  shadd(t0, idx, y, t0, LogBytesPerInt);
+  // shadd(t0, idx, y, t0, LogBytesPerInt);
+  slli(t0, idx, LogBytesPerInt);
+  add(t0, t0, y);
   ld(yz_idx2, Address(t0, 0));
   ld(yz_idx1, Address(t0, wordSize));
 
-  shadd(tmp6, idx, z, t0, LogBytesPerInt);
+  // shadd(tmp6, idx, z, t0, LogBytesPerInt);
+  slli(t0, idx, LogBytesPerInt);
+  add(tmp6, t0, z);
 
   ror(yz_idx1, yz_idx1, 32); // convert big-endian to little-endian
   ror(yz_idx2, yz_idx2, 32);
@@ -5701,14 +5741,18 @@ void MacroAssembler::multiply_128_x_128_loop(Register y, Register z,
   subiw(idx, idx, 2);
   bltz(idx, L_check_1);
 
-  shadd(t0, idx, y, t0, LogBytesPerInt);
+  // shadd(t0, idx, y, t0, LogBytesPerInt);
+  slli(t0, idx, LogBytesPerInt);
+  add(t0, t0, y);
   ld(yz_idx1, Address(t0, 0));
   ror(yz_idx1, yz_idx1, 32);
 
   mul(tmp3, product_hi, yz_idx1); //  yz_idx1 * product_hi -> tmp4:tmp3
   mulhu(tmp4, product_hi, yz_idx1);
 
-  shadd(t0, idx, z, t0, LogBytesPerInt);
+  // shadd(t0, idx, z, t0, LogBytesPerInt);
+  slli(t0, idx, LogBytesPerInt);
+  add(t0, t0, z);
   ld(yz_idx2, Address(t0, 0));
   ror(yz_idx2, yz_idx2, 32, tmp);
 
@@ -5722,17 +5766,23 @@ void MacroAssembler::multiply_128_x_128_loop(Register y, Register z,
   andi(idx, idx, 0x1);
   subiw(idx, idx, 1);
   bltz(idx, L_post_third_loop_done);
-  shadd(t0, idx, y, t0, LogBytesPerInt);
+  // shadd(t0, idx, y, t0, LogBytesPerInt);
+  slli(t0, idx, LogBytesPerInt);
+  add(t0, t0, y);
   lwu(tmp4, Address(t0, 0));
   mul(tmp3, tmp4, product_hi); //  tmp4 * product_hi -> carry2:tmp3
   mulhu(carry2, tmp4, product_hi);
 
-  shadd(t0, idx, z, t0, LogBytesPerInt);
+  // shadd(t0, idx, z, t0, LogBytesPerInt);
+  slli(t0, idx, LogBytesPerInt);
+  add(t0, t0, z);
   lwu(tmp4, Address(t0, 0));
 
   add2_with_carry(carry2, carry2, tmp3, tmp4, carry, t0);
 
-  shadd(t0, idx, z, t0, LogBytesPerInt);
+  // shadd(t0, idx, z, t0, LogBytesPerInt);
+  slli(t0, idx, LogBytesPerInt);
+  add(t0, t0, z);
   sw(tmp3, Address(t0, 0));
 
   slli(t0, carry2, 32);
@@ -5792,13 +5842,17 @@ void MacroAssembler::multiply_to_len(Register x, Register xlen, Register y, Regi
   subiw(kdx, kdx, 1);
   beqz(kdx, L_carry);
 
-  shadd(t0, kdx, z, t0, LogBytesPerInt);
+  // shadd(t0, kdx, z, t0, LogBytesPerInt);
+  slli(t0, kdx, LogBytesPerInt);
+  add(t0, t0, z);
   sw(carry, Address(t0, 0));
   srli(carry, carry, 32);
   subiw(kdx, kdx, 1);
 
   bind(L_carry);
-  shadd(t0, kdx, z, t0, LogBytesPerInt);
+  // shadd(t0, kdx, z, t0, LogBytesPerInt);
+  slli(t0, kdx, LogBytesPerInt);
+  add(t0, t0, z);
   sw(carry, Address(t0, 0));
 
   // Second and third (nested) loops.
@@ -5827,12 +5881,16 @@ void MacroAssembler::multiply_to_len(Register x, Register xlen, Register y, Regi
   sd(z, Address(sp, 0));
 
   Label L_last_x;
-  shadd(t0, xstart, z, t0, LogBytesPerInt);
+  // shadd(t0, xstart, z, t0, LogBytesPerInt);
+  slli(t0, xstart, LogBytesPerInt);
+  add(t0, t0, z);
   addi(z, t0, 4);
   subiw(xstart, xstart, 1); // i = xstart-1;
   bltz(xstart, L_last_x);
 
-  shadd(t0, xstart, x, t0, LogBytesPerInt);
+  // shadd(t0, xstart, x, t0, LogBytesPerInt);
+  slli(t0, xstart, LogBytesPerInt);
+  add(t0, t0, x);
   ld(product_hi, Address(t0, 0));
   ror(product_hi, product_hi, 32); // convert big-endian to little-endian
 
@@ -5851,14 +5909,18 @@ void MacroAssembler::multiply_to_len(Register x, Register xlen, Register y, Regi
   addi(sp, sp, 4 * wordSize);
 
   addiw(tmp3, xlen, 1);
-  shadd(t0, tmp3, z, t0, LogBytesPerInt);
+  // shadd(t0, tmp3, z, t0, LogBytesPerInt);
+  slli(t0, tmp3, LogBytesPerInt);
+  add(t0, t0, z);
   sw(carry, Address(t0, 0));
 
   subiw(tmp3, tmp3, 1);
   bltz(tmp3, L_done);
 
   srli(carry, carry, 32);
-  shadd(t0, tmp3, z, t0, LogBytesPerInt);
+  // shadd(t0, tmp3, z, t0, LogBytesPerInt);
+  slli(t0, tmp3, LogBytesPerInt);
+  add(t0, t0, z);
   sw(carry, Address(t0, 0));
   j(L_second_loop_aligned);
 
@@ -6061,7 +6123,9 @@ void MacroAssembler::fill_words(Register base, Register cnt, Register value) {
 
   andi(t0, cnt, unroll - 1);
   sub(cnt, cnt, t0);
-  shadd(base, t0, base, t1, 3);
+  // shadd(base, t0, base, t1, 3);
+  slli(t1, t0, 3);
+  add(base, t1, base);
   la(t1, entry);
   slli(t0, t0, 2);
   sub(t1, t1, t0);
@@ -6332,7 +6396,9 @@ void MacroAssembler::zero_memory(Register addr, Register len, Register tmp) {
   andi(t0, len, unroll - 1);  // t0 = cnt % unroll
   sub(len, len, t0);          // cnt -= unroll
   // tmp always points to the end of the region we're about to zero
-  shadd(tmp, t0, addr, t1, LogBytesPerWord);
+  // shadd(tmp, t0, addr, t1, LogBytesPerWord);
+  slli(t1, t0, LogBytesPerWord);
+  add(tmp, t1, addr);
   la(t1, entry);
   slli(t0, t0, 2);
   sub(t1, t1, t0);
@@ -6370,9 +6436,76 @@ void MacroAssembler::shadd(Register Rd, Register Rs1, Register Rs2, Register tmp
   if (shamt != 0) {
     assert_different_registers(Rs2, tmp);
     slli(tmp, Rs1, shamt);
-    add(Rd, Rs2, tmp);
+    add(Rd, tmp, Rs2);
   } else {
     add(Rd, Rs1, Rs2);
+  }
+}
+
+bool MacroAssembler::shadd_can_merge(Register Rd, Register Rs1, Register Rs2) {
+  // Only merge if Zba is available
+  if (!UseZba) {
+    return false;
+  }
+
+  address prev = pc() - MacroAssembler::instruction_size;
+  address last = code()->last_insn();
+
+  if (last != nullptr && is_shadd_shamt_at(prev) && prev != last) {
+    // we only merge pattern like this:
+    // slli(Rb, Ra, shamt);
+    // add(Rd, Rb, Rc)
+    // to be merged into:
+    // shxadd(Rd, Ra, Rc)
+    Register shift_dst = extract_rd(prev);
+    if (shift_dst != Rs1) {
+      return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+bool MacroAssembler::try_merge_shadd(Register Rd, Register Rs1, Register Rs2) {
+  if (shadd_can_merge(Rd, Rs1, Rs2)) {
+    merge_shadd(Rd, Rs1, Rs2);
+    code()->clear_last_insn();
+    return true;
+  } else {
+    return false;
+  }
+}
+
+// merge slli(Rx, Rs1, shamt) + add(Rd, Rx, Rs2) pattern into shadd(Rd, Rs1, Rs2)
+// where Rs1 is the operand for left shift with shamt, and Rs2 is the operand to be add
+void MacroAssembler::merge_shadd(Register Rd, Register Rs1, Register Rs2) {
+  assert(UseZba, "shadd only merged when Zba is available");
+  address prev = pc() - MacroAssembler::instruction_size;
+  // get src register and shamt from the slli instruction
+  Register shift_src = extract_rs1(prev);
+  unsigned shamt = Assembler::extract(Assembler::ld_instr(prev), 25, 20);
+  assert(shamt > 0 && shamt <= 3, "sanity");
+  // we cannot assert Rs1 == shift_src here as Rs1 maybe the result register of slli
+
+  BLOCK_COMMENT("merged shadd");
+  // Overwrite previous generate slli
+  code_section()->set_end(prev);
+  if (shamt == 1) {
+    sh1add(Rd, shift_src, Rs2);
+    return;
+  } else if (shamt == 2) {
+    sh2add(Rd, shift_src, Rs2);
+    return;
+  } else if (shamt == 3) {
+    sh3add(Rd, shift_src, Rs2);
+    return;
+  }
+}
+
+void MacroAssembler::add(Register Rd, Register Rs1, Register Rs2) {
+  if (!try_merge_shadd(Rd, Rs1, Rs2)) {
+    Assembler::add(Rd, Rs1, Rs2);
   }
 }
 
